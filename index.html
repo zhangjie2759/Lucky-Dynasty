@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>强运家族 Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="startScreen" class="screen start-screen">
+      <div class="title-card">
+        <div class="eyebrow">SCRATCH · SPEND · PASS DOWN</div>
+        <h1>强运家族</h1>
+        <p>每一代亲手刮开命运。小奖可以兑现，也可以放弃，保留强运去搏改命大奖。</p>
+        <button id="startBtn" class="primary-btn">开始暴富预演</button>
+        <button id="continueBtn" class="ghost-btn hidden">继续上次家族</button>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <div class="tiny-label">GENERATION</div>
+          <div class="gen-title">第 <span id="generationText">1</span> 代</div>
+        </div>
+        <button id="resetBtn" class="mini-btn">重开</button>
+      </header>
+
+      <main class="main-layout">
+        <section class="stats-panel card-panel">
+          <div class="stat">
+            <span>现金</span>
+            <strong id="cashText">¥0</strong>
+          </div>
+          <div class="stat">
+            <span>强运</span>
+            <strong><span id="luckText">0</span></strong>
+            <div class="bar"><i id="luckBar"></i></div>
+          </div>
+          <div class="stat">
+            <span>本代爽度</span>
+            <strong id="joyText">0</strong>
+            <div class="bar joy"><i id="joyBar"></i></div>
+          </div>
+          <div class="stat">
+            <span>大奖碎片</span>
+            <strong><span id="shardText">0</span>/3</strong>
+          </div>
+        </section>
+
+        <section id="scratchMode" class="mode-section">
+          <div class="section-head">
+            <div>
+              <h2>强运刮刮乐</h2>
+              <p id="ticketHint">买一张彩票，然后用手指/鼠标刮开银色涂层。</p>
+            </div>
+            <div class="ticket-count">本代剩余 <span id="ticketsLeftText">3</span> 张</div>
+          </div>
+
+          <div id="ticketChooser" class="ticket-chooser card-panel">
+            <button class="ticket-btn" data-type="small">
+              <b>小福票</b>
+              <span>¥10,000</span>
+              <small>小奖多，适合续命</small>
+            </button>
+            <button class="ticket-btn" data-type="luck">
+              <b>强运票</b>
+              <span>¥30,000</span>
+              <small>强运和碎片更容易出现</small>
+            </button>
+            <button class="ticket-btn" data-type="rich">
+              <b>暴富票</b>
+              <span>¥80,000</span>
+              <small>贵，但更可能改命</small>
+            </button>
+          </div>
+
+          <div id="scratchArea" class="scratch-area hidden">
+            <div class="scratch-header">
+              <div>
+                <div class="tiny-label">CURRENT TICKET</div>
+                <strong id="currentTicketName">强运票</strong>
+              </div>
+              <button id="finishTicketBtn" class="mini-btn">结束本张</button>
+            </div>
+            <div class="scratch-stage" id="scratchStage">
+              <div id="scratchGrid" class="scratch-grid"></div>
+              <canvas id="scratchCanvas" aria-label="刮刮乐涂层"></canvas>
+            </div>
+            <p class="scratch-tip">拖动刮开。刮到奖金时，你可以选择“兑现”或“不兑现”。</p>
+          </div>
+
+          <div class="action-row">
+            <button id="nextGenerationBtn" class="ghost-btn">传给下一代</button>
+            <button id="openShopBtn" class="secondary-btn hidden">进入消费模式</button>
+          </div>
+        </section>
+
+        <section id="shopMode" class="mode-section hidden">
+          <div class="section-head">
+            <div>
+              <h2>暴富消费模式</h2>
+              <p>把横财花成家族传说。买过的资产会进入图鉴。</p>
+            </div>
+            <button id="leaveShopBtn" class="primary-btn">传给下一代</button>
+          </div>
+          <div id="shopGrid" class="shop-grid"></div>
+        </section>
+
+        <section class="collection-panel card-panel">
+          <div class="section-head small">
+            <div>
+              <h2>家族资产图鉴</h2>
+              <p>彩色=拥有，灰色=曾经拥有。</p>
+            </div>
+          </div>
+          <div id="collectionGrid" class="collection-grid"></div>
+        </section>
+
+        <section class="log-panel card-panel">
+          <h2>家族记录</h2>
+          <div id="logList" class="log-list"></div>
+        </section>
+      </main>
+    </section>
+
+    <div id="choiceModal" class="modal hidden">
+      <div class="modal-box">
+        <div class="modal-icon">🎉</div>
+        <h3 id="modalTitle">刮中了奖金</h3>
+        <p id="modalText">你要现在兑现，还是保留强运继续搏大奖？</p>
+        <div class="modal-actions">
+          <button id="cashOutBtn" class="primary-btn">兑现</button>
+          <button id="keepLuckBtn" class="secondary-btn">不兑现，保留强运</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="endScreen" class="screen end-screen hidden">
+      <div class="title-card">
+        <div class="eyebrow">FAMILY RESULT</div>
+        <h1 id="endingTitle">家族结算</h1>
+        <p id="endingText"></p>
+        <div id="endingStats" class="ending-stats"></div>
+        <button id="playAgainBtn" class="primary-btn">再开一个家族</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
