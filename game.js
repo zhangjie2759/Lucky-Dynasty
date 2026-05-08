@@ -1,14 +1,37 @@
 'use strict';
 
+const STORAGE_KEY = 'strongLuckFamilyDemoV2_codeTicket';
 const MAX_GENERATIONS = 5;
 const START_CASH = 100000;
 const START_LUCK = 50;
 const MAX_TICKETS_PER_GEN = 3;
+const GRAND_PRIZE_THRESHOLD = 1000000;
 
 const TICKETS = {
-  small: { name: '小福票', cost: 10000, prizeBias: 1.25, shardBias: 0.65, luckBias: 0.9 },
-  luck: { name: '强运票', cost: 30000, prizeBias: 1.0, shardBias: 1.1, luckBias: 1.35 },
-  rich: { name: '暴富票', cost: 80000, prizeBias: 0.8, shardBias: 1.65, luckBias: 1.0 }
+  small: {
+    name: '小福票',
+    cost: 10000,
+    bonus: 0,
+    desc: '保底小奖，适合续命',
+    weights: { 2: 62, 3: 27, 4: 8, 5: 2.1, 6: 0.65, 7: 0.18, 8: 0.06, 9: 0.01 },
+    payouts: { 2: 10000, 3: 30000, 4: 120000, 5: 600000, 6: 1800000, 7: 8000000, 8: 30000000, 9: 100000000 }
+  },
+  luck: {
+    name: '强运票',
+    cost: 30000,
+    bonus: 12,
+    desc: '更容易匹配尾4/尾5',
+    weights: { 2: 42, 3: 32, 4: 16, 5: 6, 6: 2.5, 7: 0.9, 8: 0.45, 9: 0.15 },
+    payouts: { 2: 20000, 3: 80000, 4: 500000, 5: 2000000, 6: 8000000, 7: 30000000, 8: 100000000, 9: 500000000 }
+  },
+  rich: {
+    name: '暴富票',
+    cost: 80000,
+    bonus: 24,
+    desc: '更容易进入消费模式',
+    weights: { 2: 30, 3: 30, 4: 22, 5: 10, 6: 4.5, 7: 2, 8: 1, 9: 0.5 },
+    payouts: { 2: 30000, 3: 150000, 4: 1000000, 5: 5000000, 6: 20000000, 7: 80000000, 8: 300000000, 9: 1000000000 }
+  }
 };
 
 const ASSETS = [
@@ -27,20 +50,19 @@ const ASSETS = [
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => '¥' + Math.max(0, Math.floor(n)).toLocaleString('zh-CN');
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const rand = (min, max) => Math.random() * (max - min) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 let state;
 let currentTicket = null;
 let scratch = {
   isDown: false,
-  rect: null,
   canvas: null,
   ctx: null,
-  progress: Array(9).fill(0),
-  revealed: Array(9).fill(false),
+  rect: null,
+  checked: false,
+  locked: false,
   pendingPrize: null,
-  locked: false
+  lastMeasure: 0
 };
 
 function freshState() {
@@ -49,7 +71,6 @@ function freshState() {
     cash: START_CASH,
     luck: START_LUCK,
     joy: 0,
-    shards: 0,
     ticketsLeft: MAX_TICKETS_PER_GEN,
     grandWonThisGen: false,
     totalGrandWins: 0,
@@ -61,12 +82,12 @@ function freshState() {
 }
 
 function save() {
-  localStorage.setItem('strongLuckFamilyDemo', JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function load() {
   try {
-    const raw = localStorage.getItem('strongLuckFamilyDemo');
+    const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (e) {
     return null;
@@ -98,10 +119,10 @@ function renderAll() {
   $('cashText').textContent = fmt(state.cash);
   $('luckText').textContent = Math.round(state.luck);
   $('joyText').textContent = Math.round(state.joy);
-  $('shardText').textContent = state.shards;
+  $('grandWinText').textContent = state.totalGrandWins;
   $('ticketsLeftText').textContent = state.ticketsLeft;
-  $('luckBar').style.width = clamp(state.luck, 0, 100) + '%';
-  $('joyBar').style.width = clamp(state.joy, 0, 120) / 120 * 100 + '%';
+  $('luckBar').style.width = clamp(state.luck, 0, 120) / 120 * 100 + '%';
+  $('joyBar').style.width = clamp(state.joy, 0, 140) / 140 * 100 + '%';
   renderTicketButtons();
   renderShop();
   renderCollection();
@@ -200,77 +221,86 @@ function startTicket(type) {
   if (!ticket || state.cash < ticket.cost || state.ticketsLeft <= 0 || currentTicket) return;
   state.cash -= ticket.cost;
   state.ticketsLeft -= 1;
+
+  const winningCode = randomCode();
+  const tailMatch = chooseTailMatch(ticket);
+  const playerCode = makePlayerCode(winningCode, tailMatch);
+  const prize = ticket.payouts[tailMatch] || 0;
+
   currentTicket = {
     type,
     name: ticket.name,
-    rewards: generateRewards(ticket),
-    finished: false
+    winningCode,
+    playerCode,
+    tailMatch,
+    prize,
+    checked: false,
+    scratchedPercent: 0
   };
+
   $('currentTicketName').textContent = ticket.name;
+  $('winningCodeText').textContent = formatCode(winningCode);
+  $('playerCodeText').textContent = formatCode(playerCode);
+  $('playerCodeText').classList.remove('matched');
+  $('matchHintText').textContent = '刮开后自动验奖';
+  $('matchRuleText').textContent = `${ticket.name}：尾2保底小奖，尾5以上算改命大奖。当前强运 ${Math.round(state.luck)}。`;
   $('ticketChooser').classList.add('hidden');
   $('scratchArea').classList.remove('hidden');
-  addLog(`买下「${ticket.name}」，这一张可能改命。`);
+  $('finishTicketBtn').textContent = '放弃本张';
+  $('checkTicketBtn').disabled = false;
+
+  addLog(`买下「${ticket.name}」，刮开9位强运码验奖。`);
   renderAll();
   requestAnimationFrame(() => setupScratchCard());
 }
 
-function generateRewards(ticket) {
-  const rewards = [];
-  const luck = clamp(state.luck, 0, 120);
-  const shardChance = (0.09 + luck / 520) * ticket.shardBias;
-  const luckChance = 0.15 * ticket.luckBias;
-  const riskChance = 0.09 + (ticket.name === '暴富票' ? 0.04 : 0);
-  const prizeChance = 0.38 * ticket.prizeBias;
+function randomCode() {
+  let s = '';
+  for (let i = 0; i < 9; i++) s += Math.floor(Math.random() * 10);
+  return s;
+}
 
-  for (let i = 0; i < 9; i++) {
-    const r = Math.random();
-    if (r < shardChance) {
-      rewards.push({ type: 'shard', icon: '✨', text: '大奖碎片' });
-    } else if (r < shardChance + luckChance) {
-      const amount = Math.round(rand(6, 15));
-      rewards.push({ type: 'luck', icon: '🍀', text: `强运+${amount}`, amount });
-    } else if (r < shardChance + luckChance + riskChance) {
-      const amount = Math.round(rand(6, 13));
-      rewards.push({ type: 'bad', icon: '☁️', text: `霉运-${amount}`, amount });
-    } else if (r < shardChance + luckChance + riskChance + prizeChance) {
-      const base = ticket.name === '小福票'
-        ? pick([10000, 20000, 30000, 50000])
-        : ticket.name === '强运票'
-          ? pick([30000, 50000, 80000, 100000, 150000])
-          : pick([50000, 100000, 200000, 300000, 500000]);
-      rewards.push({ type: 'prize', icon: '💰', text: fmt(base), amount: base });
-    } else {
-      rewards.push({ type: 'empty', icon: '➖', text: '空' });
-    }
-  }
+function formatCode(code) {
+  return code.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+}
 
-  if (!rewards.some((x) => x.type === 'prize')) {
-    const idx = Math.floor(Math.random() * 9);
-    rewards[idx] = { type: 'prize', icon: '💰', text: fmt(30000), amount: 30000 };
+function chooseTailMatch(ticket) {
+  const luck = clamp(state.luck + ticket.bonus, 0, 120);
+  const luckFactor = (luck - 50) / 70;
+  const entries = Object.entries(ticket.weights).map(([match, weight]) => {
+    const m = Number(match);
+    const multiplier = clamp(1 + luckFactor * (m - 2) * 0.42, 0.2, 4.2);
+    return [m, weight * multiplier];
+  });
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let r = Math.random() * total;
+  for (const [match, weight] of entries) {
+    r -= weight;
+    if (r <= 0) return match;
   }
-  if (state.luck >= 75 && !rewards.some((x) => x.type === 'shard') && Math.random() < 0.75) {
-    const idx = Math.floor(Math.random() * 9);
-    rewards[idx] = { type: 'shard', icon: '✨', text: '大奖碎片' };
+  return 2;
+}
+
+function makePlayerCode(winningCode, tailMatch) {
+  if (tailMatch >= 9) return winningCode;
+  const arr = randomCode().split('');
+  const start = 9 - tailMatch;
+  for (let i = start; i < 9; i++) arr[i] = winningCode[i];
+
+  // 保证实际匹配位数不会因为随机前一位碰巧相同而变多。
+  if (start - 1 >= 0 && arr[start - 1] === winningCode[start - 1]) {
+    arr[start - 1] = String((Number(winningCode[start - 1]) + 1 + Math.floor(Math.random() * 9)) % 10);
   }
-  return rewards.sort(() => Math.random() - 0.5);
+  return arr.join('');
 }
 
 function setupScratchCard() {
-  const grid = $('scratchGrid');
-  grid.innerHTML = currentTicket.rewards.map((r, idx) => `
-    <div class="scratch-cell" data-cell="${idx}">
-      <span class="icon">${r.icon}</span>
-      <span class="txt">${r.text}</span>
-    </div>
-  `).join('');
-
   scratch.canvas = $('scratchCanvas');
   scratch.ctx = scratch.canvas.getContext('2d', { willReadFrequently: true });
-  scratch.progress = Array(9).fill(0);
-  scratch.revealed = Array(9).fill(false);
-  scratch.pendingPrize = null;
+  scratch.checked = false;
   scratch.locked = false;
-
+  scratch.pendingPrize = null;
+  scratch.lastMeasure = 0;
   resizeScratchCanvas();
   paintScratchLayer();
 }
@@ -280,8 +310,8 @@ function resizeScratchCanvas() {
   const rect = stage.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   scratch.rect = rect;
-  scratch.canvas.width = Math.floor(rect.width * dpr);
-  scratch.canvas.height = Math.floor(rect.height * dpr);
+  scratch.canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  scratch.canvas.height = Math.max(1, Math.floor(rect.height * dpr));
   scratch.canvas.style.width = rect.width + 'px';
   scratch.canvas.style.height = rect.height + 'px';
   scratch.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -293,97 +323,103 @@ function paintScratchLayer() {
   const h = scratch.rect.height;
   ctx.globalCompositeOperation = 'source-over';
   const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, '#d8d5cc');
-  g.addColorStop(0.45, '#a9a49a');
-  g.addColorStop(1, '#ece7dc');
+  g.addColorStop(0, '#e9e5dc');
+  g.addColorStop(0.35, '#a6a096');
+  g.addColorStop(0.7, '#d8d2c6');
+  g.addColorStop(1, '#f4eee1');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(255,255,255,.24)';
-  for (let i = -w; i < w * 2; i += 26) {
+
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  for (let i = -w; i < w * 2; i += 24) {
     ctx.save();
     ctx.translate(i, 0);
-    ctx.rotate(-0.7);
-    ctx.fillRect(0, -h, 9, h * 3);
+    ctx.rotate(-0.72);
+    ctx.fillRect(0, -h, 8, h * 3);
     ctx.restore();
   }
-  ctx.fillStyle = 'rgba(37,25,13,.45)';
-  ctx.font = '900 18px -apple-system, BlinkMacSystemFont, sans-serif';
+
+  ctx.fillStyle = 'rgba(37,25,13,.46)';
+  ctx.font = '900 22px -apple-system, BlinkMacSystemFont, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('刮开强运', w / 2, h / 2);
+  ctx.fillText('刮开你的9位强运码', w / 2, h / 2 - 10);
+  ctx.font = '800 13px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillText('尾号匹配越多，奖金越大', w / 2, h / 2 + 22);
 }
 
 function scratchAt(clientX, clientY) {
-  if (!currentTicket || scratch.locked) return;
+  if (!currentTicket || scratch.locked || scratch.checked) return;
   const rect = scratch.canvas.getBoundingClientRect();
   const x = clientX - rect.left;
   const y = clientY - rect.top;
-  const ctx = scratch.ctx;
-  const radius = Math.max(18, rect.width * 0.055);
+  const radius = Math.max(22, rect.width * 0.065);
 
+  const ctx = scratch.ctx;
   ctx.globalCompositeOperation = 'destination-out';
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  const cellSize = rect.width / 3;
-  const col = clamp(Math.floor(x / cellSize), 0, 2);
-  const row = clamp(Math.floor(y / cellSize), 0, 2);
-  const idx = row * 3 + col;
-  scratch.progress[idx] += 12;
-
-  if (!scratch.revealed[idx] && scratch.progress[idx] >= 36) {
-    revealCell(idx);
+  const now = performance.now();
+  if (now - scratch.lastMeasure > 180) {
+    scratch.lastMeasure = now;
+    const percent = measureScratchPercent();
+    currentTicket.scratchedPercent = percent;
+    if (percent >= 0.48) checkTicket();
   }
 }
 
-function clearCellOverlay(idx) {
-  const rect = scratch.canvas.getBoundingClientRect();
-  const cellSize = rect.width / 3;
-  const col = idx % 3;
-  const row = Math.floor(idx / 3);
+function measureScratchPercent() {
+  const canvas = scratch.canvas;
+  const ctx = scratch.ctx;
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let clear = 0;
+  const step = 16;
+  for (let i = 3; i < data.length; i += 4 * step) {
+    if (data[i] < 80) clear += 1;
+  }
+  return clear / Math.ceil((data.length / 4) / step);
+}
+
+function clearScratchLayer() {
   scratch.ctx.globalCompositeOperation = 'destination-out';
-  scratch.ctx.fillRect(col * cellSize + 8, row * cellSize + 8, cellSize - 16, cellSize - 16);
+  scratch.ctx.fillRect(0, 0, scratch.rect.width, scratch.rect.height);
 }
 
-function revealCell(idx) {
-  scratch.revealed[idx] = true;
-  clearCellOverlay(idx);
-  const cell = document.querySelector(`[data-cell="${idx}"]`);
-  if (cell) cell.classList.add('revealed');
-  const reward = currentTicket.rewards[idx];
-  processReward(reward);
-}
+function checkTicket() {
+  if (!currentTicket || scratch.checked) return;
+  scratch.checked = true;
+  scratch.locked = true;
+  clearScratchLayer();
+  $('checkTicketBtn').disabled = true;
+  $('finishTicketBtn').textContent = '结束本张';
+  $('playerCodeText').classList.add('matched');
 
-function processReward(reward) {
-  if (reward.type === 'prize') {
-    scratch.locked = true;
-    scratch.pendingPrize = reward;
-    showPrizeChoice(reward.amount);
-  } else if (reward.type === 'luck') {
-    state.luck = clamp(state.luck + reward.amount, 0, 120);
-    addLog(`刮出强运符号，强运+${reward.amount}。`);
+  const match = currentTicket.tailMatch;
+  const prize = currentTicket.prize;
+  const label = match >= 9 ? '9位全中' : `尾${match}位相同`;
+  $('matchHintText').textContent = `${label} · ${fmt(prize)}`;
+
+  if (prize > 0) {
+    scratch.pendingPrize = { amount: prize, match, type: currentTicket.type };
+    setTimeout(() => showPrizeChoice(prize, match), 280);
+  } else {
+    addLog(`这张没有中奖。`);
+    scratch.locked = false;
     renderAll();
-  } else if (reward.type === 'bad') {
-    state.luck = clamp(state.luck - reward.amount, 0, 120);
-    addLog(`刮出一团霉运，强运-${reward.amount}。`);
-    renderAll();
-  } else if (reward.type === 'shard') {
-    state.shards += 1;
-    addLog(`获得大奖碎片 ${state.shards}/3。`);
-    if (state.shards >= 3) {
-      triggerGrandPrize();
-    } else {
-      renderAll();
-    }
   }
 }
 
-function showPrizeChoice(amount) {
-  $('modalTitle').textContent = `刮中了 ${fmt(amount)}`;
-  $('modalText').textContent = '现在兑现可以立刻拿钱，但会消耗强运；不兑现会放弃这笔钱，保留家族大运去搏更大的奖。';
+function showPrizeChoice(amount, match) {
+  const isGrand = amount >= GRAND_PRIZE_THRESHOLD;
+  $('modalIcon').textContent = isGrand ? '🏆' : '🎉';
+  $('modalTitle').textContent = `${match >= 9 ? '9位全中' : '尾' + match + '位中奖'}：${fmt(amount)}`;
+  $('modalText').textContent = isGrand
+    ? '这笔钱已经足够进入暴富消费模式。兑现会拿到奖金，但会明显消耗强运；不兑现会放弃奖金，继续把家族大运往后压。'
+    : '现在兑现可以立刻拿钱，但会消耗强运；不兑现会放弃这笔钱，保留家族大运去搏更大的奖。';
   $('cashOutBtn').textContent = `兑现 ${fmt(amount)}`;
-  $('keepLuckBtn').textContent = '不兑现，强运+12';
+  $('keepLuckBtn').textContent = `不兑现，强运+${keepLuckGain(amount, match)}`;
   $('choiceModal').classList.remove('hidden');
 }
 
@@ -391,18 +427,36 @@ function cashOutPrize() {
   const reward = scratch.pendingPrize;
   if (!reward) return;
   state.cash += reward.amount;
-  const loss = Math.max(6, Math.round(reward.amount / 18000));
+  const loss = cashOutLuckLoss(reward.amount, reward.match);
   state.luck = clamp(state.luck - loss, 0, 120);
   addLog(`兑现${fmt(reward.amount)}，强运消耗${loss}点。`);
+
+  if (reward.amount >= GRAND_PRIZE_THRESHOLD) {
+    state.grandWonThisGen = true;
+    state.totalGrandWins += 1;
+    addLog(`第${state.generation}代正式进入暴富消费模式。`);
+  }
   closeChoice();
+  if (reward.amount >= GRAND_PRIZE_THRESHOLD) {
+    setTimeout(() => openShop(), 380);
+  }
 }
 
 function keepLuckPrize() {
   const reward = scratch.pendingPrize;
   if (!reward) return;
-  state.luck = clamp(state.luck + 12, 0, 120);
-  addLog(`放弃${fmt(reward.amount)}，把这口气留给大奖。`);
+  const gain = keepLuckGain(reward.amount, reward.match);
+  state.luck = clamp(state.luck + gain, 0, 120);
+  addLog(`放弃${fmt(reward.amount)}，强运+${gain}，把这口气留给后面。`);
   closeChoice();
+}
+
+function cashOutLuckLoss(amount, match) {
+  return clamp(Math.round(match * 3 + amount / 180000), 6, 55);
+}
+
+function keepLuckGain(amount, match) {
+  return clamp(Math.round(6 + match * 2 + Math.min(amount / 1000000, 10)), 10, 32);
 }
 
 function closeChoice() {
@@ -412,35 +466,33 @@ function closeChoice() {
   renderAll();
 }
 
-function triggerGrandPrize() {
-  const luckMultiplier = 1 + clamp(state.luck, 0, 120) / 80;
-  const generationMultiplier = 1 + state.generation * 0.12;
-  const base = pick([1000000, 2000000, 3000000, 5000000, 8000000, 12000000]);
-  const jackpot = Math.floor(base * luckMultiplier * generationMultiplier);
-  state.cash += jackpot;
-  state.shards = 0;
-  state.grandWonThisGen = true;
-  state.totalGrandWins += 1;
-  state.luck = clamp(state.luck - 30, 0, 120);
-  addLog(`中大奖！第${state.generation}代拿到${fmt(jackpot)}，正式进入暴富消费。`);
-  renderAll();
-  $('openShopBtn').classList.remove('hidden');
-  setTimeout(() => openShop(), 450);
-}
-
 function finishTicket() {
   if (!currentTicket) return;
+  if (!scratch.checked && !confirm('这张还没验奖，确定放弃吗？')) return;
   currentTicket = null;
+  scratch.checked = false;
+  scratch.locked = false;
+  scratch.pendingPrize = null;
   $('scratchArea').classList.add('hidden');
   $('ticketChooser').classList.remove('hidden');
   renderAll();
 }
 
 function openShop() {
-  finishTicket();
+  if (currentTicket && scratch.pendingPrize) return;
+  if (currentTicket) finishTicketWithoutConfirm();
   $('scratchMode').classList.add('hidden');
   $('shopMode').classList.remove('hidden');
   renderAll();
+}
+
+function finishTicketWithoutConfirm() {
+  currentTicket = null;
+  scratch.checked = false;
+  scratch.locked = false;
+  scratch.pendingPrize = null;
+  $('scratchArea').classList.add('hidden');
+  $('ticketChooser').classList.remove('hidden');
 }
 
 function closeShopAndNextGen() {
@@ -470,7 +522,6 @@ function nextGeneration() {
   const oldGen = state.generation;
   state.generation += 1;
   state.ticketsLeft = MAX_TICKETS_PER_GEN;
-  state.shards = 0;
   state.grandWonThisGen = false;
   state.joy = 0;
   state.luck = clamp(Math.round(state.luck * 0.45 + inheritedLuck), 8, 115);
@@ -507,7 +558,7 @@ function endGame(bankrupt) {
   $('endScreen').classList.remove('hidden');
   const assetValue = totalAssetValue();
   const collected = Object.keys(state.collection).length;
-  const score = Math.floor(state.cash + assetValue + collected * 180000 + state.totalGrandWins * 500000);
+  const score = Math.floor(state.cash + assetValue + collected * 180000 + state.totalGrandWins * 500000 + state.joy * 6000);
   let title = bankrupt ? '家族破产' : '五代结算';
   let grade = '普通家庭';
   if (score > 50000000) grade = '传奇强运世家';
@@ -524,7 +575,7 @@ function endGame(bankrupt) {
     <div><span>图鉴数量</span><strong>${collected}/${ASSETS.length}</strong></div>
     <div><span>家族评级</span><strong>${grade}</strong></div>
   `;
-  localStorage.removeItem('strongLuckFamilyDemo');
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 function bindEvents() {
@@ -539,7 +590,7 @@ function bindEvents() {
   });
   $('resetBtn').addEventListener('click', () => {
     if (!confirm('确定重开这个家族吗？')) return;
-    localStorage.removeItem('strongLuckFamilyDemo');
+    localStorage.removeItem(STORAGE_KEY);
     currentTicket = null;
     state = freshState();
     showGame();
@@ -553,6 +604,7 @@ function bindEvents() {
     btn.addEventListener('click', () => startTicket(btn.dataset.type));
   });
   $('finishTicketBtn').addEventListener('click', finishTicket);
+  $('checkTicketBtn').addEventListener('click', checkTicket);
   $('nextGenerationBtn').addEventListener('click', nextGeneration);
   $('openShopBtn').addEventListener('click', openShop);
   $('leaveShopBtn').addEventListener('click', closeShopAndNextGen);
@@ -561,6 +613,7 @@ function bindEvents() {
 
   const canvas = $('scratchCanvas');
   canvas.addEventListener('pointerdown', (e) => {
+    if (!currentTicket) return;
     scratch.isDown = true;
     canvas.setPointerCapture(e.pointerId);
     scratchAt(e.clientX, e.clientY);
