@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>强运家族 Demo</title>
+  <title>强运家族 Demo v4</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app">
     <section id="startScreen" class="screen start-screen">
       <div class="title-card">
-        <div class="eyebrow">SCRATCH · SPEND · PASS DOWN</div>
+        <div class="eyebrow">LUCKY DYNASTY</div>
         <h1>强运家族</h1>
         <p>每一代亲手刮开9位强运码。小奖可以兑现，也可以放弃，保留强运去搏改命大奖。</p>
         <button id="startBtn" class="primary-btn">开始暴富预演</button>
@@ -18,51 +18,47 @@
       </div>
     </section>
 
-    <section id="gameScreen" class="screen hidden">
+    <section id="gameScreen" class="screen game-screen hidden">
       <header class="topbar">
-        <div>
+        <div class="top-title">
           <div class="tiny-label">GENERATION</div>
-          <div class="gen-title">第 <span id="generationText">1</span> 代</div>
+          <div class="gen-title">第 <span id="generationText">1</span> 代 · <span id="heirNameText">张大发</span></div>
         </div>
         <button id="resetBtn" class="mini-btn">重开</button>
       </header>
 
-      <main class="main-layout">
-        <section class="stats-panel card-panel">
-          <div class="stat">
-            <span>现金</span>
-            <strong id="cashText">¥0</strong>
-          </div>
-          <div class="stat">
-            <span>强运</span>
-            <strong><span id="luckText">0</span></strong>
-            <div class="bar"><i id="luckBar"></i></div>
-          </div>
-          <div class="stat">
-            <span>本代爽度</span>
-            <strong id="joyText">0</strong>
-            <div class="bar joy"><i id="joyBar"></i></div>
-          </div>
-          <div class="stat">
-            <span>大奖次数</span>
-            <strong><span id="grandWinText">0</span></strong>
-          </div>
-        </section>
+      <section class="quick-stats">
+        <div class="quick-stat">
+          <span>现金</span>
+          <strong id="cashText">¥0</strong>
+        </div>
+        <div class="quick-stat">
+          <span>强运</span>
+          <strong id="luckText">0</strong>
+          <i class="mini-bar"><em id="luckBar"></em></i>
+        </div>
+        <div class="quick-stat">
+          <span>本代爽度</span>
+          <strong id="joyText">0</strong>
+          <i class="mini-bar joy"><em id="joyBar"></em></i>
+        </div>
+      </section>
 
-        <section id="scratchMode" class="mode-section">
+      <main class="content-shell">
+        <section id="lotteryView" class="tab-view">
           <div class="section-head">
             <div>
-              <h2>强运刮刮乐</h2>
-              <p id="ticketHint">上方是本期中奖码。买票后，亲手刮开你的9位码，按尾号匹配位数兑奖。</p>
+              <h2>彩票店</h2>
+              <p>上方是本期中奖码。买票后，亲手刮开你的9位码，按尾号匹配位数兑奖。</p>
             </div>
-            <div class="ticket-count">本代剩余 <span id="ticketsLeftText">3</span> 张</div>
+            <div class="pill">本代剩余 <span id="ticketsLeftText">3</span> 张</div>
           </div>
 
           <div id="ticketChooser" class="ticket-chooser card-panel">
             <button class="ticket-btn" data-type="small">
               <b>小福票</b>
               <span>¥10,000</span>
-              <small>保底有小奖，适合续命</small>
+              <small>小奖稳定，适合续命</small>
             </button>
             <button class="ticket-btn" data-type="luck">
               <b>强运票</b>
@@ -76,7 +72,7 @@
             </button>
           </div>
 
-          <div id="scratchArea" class="scratch-area hidden">
+          <div id="scratchArea" class="scratch-area card-panel hidden">
             <div class="scratch-header">
               <div>
                 <div class="tiny-label">CURRENT TICKET</div>
@@ -101,44 +97,61 @@
               </div>
               <canvas id="scratchCanvas" aria-label="刮刮乐涂层"></canvas>
             </div>
-            <p class="scratch-tip">拖动刮开银色涂层。刮开约一半后会自动验奖，也可以手动验奖。</p>
+            <p class="scratch-tip">拖动刮开银色涂层。刮开约三分之二会自动验奖，也可以手动验奖。</p>
             <div class="action-row tight">
               <button id="checkTicketBtn" class="secondary-btn">我刮完了，验奖</button>
             </div>
           </div>
 
-          <div class="action-row">
+          <div class="action-row bottom-action">
             <button id="nextGenerationBtn" class="ghost-btn">传给下一代</button>
-            <button id="openShopBtn" class="secondary-btn hidden">进入消费模式</button>
+            <button id="openShopBtn" class="secondary-btn hidden">去商店消费</button>
           </div>
         </section>
 
-        <section id="shopMode" class="mode-section hidden">
+        <section id="shopView" class="tab-view hidden">
           <div class="section-head">
             <div>
-              <h2>暴富消费模式</h2>
-              <p>把横财花成家族传说。买过的资产会进入图鉴。</p>
+              <h2>商店</h2>
+              <p>把横财花成家族传说。买过的资产会进入图鉴，部分资产还能影响后代强运。</p>
             </div>
-            <button id="leaveShopBtn" class="primary-btn">传给下一代</button>
+            <button id="shopNextGenBtn" class="mini-btn">传给下一代</button>
           </div>
           <div id="shopGrid" class="shop-grid"></div>
         </section>
 
-        <section class="collection-panel card-panel">
-          <div class="section-head small">
+        <section id="assetsView" class="tab-view hidden">
+          <div class="section-head">
             <div>
-              <h2>家族资产图鉴</h2>
-              <p>彩色=拥有，灰色=曾经拥有。</p>
+              <h2>资产</h2>
+              <p>彩色是当前拥有，灰色是曾经拥有。没钱买彩票时可以变卖祖产续命。</p>
             </div>
           </div>
+          <div id="assetSummary" class="asset-summary"></div>
           <div id="collectionGrid" class="collection-grid"></div>
         </section>
 
-        <section class="log-panel card-panel">
-          <h2>家族记录</h2>
-          <div id="logList" class="log-list"></div>
+        <section id="infoView" class="tab-view hidden">
+          <div class="section-head">
+            <div>
+              <h2>个人情报</h2>
+              <p>查看这一代继承人的性格、家族状态和历史记录。</p>
+            </div>
+          </div>
+          <div id="profileCard" class="profile-card card-panel"></div>
+          <div class="log-panel card-panel">
+            <h3>家族记录</h3>
+            <div id="logList" class="log-list"></div>
+          </div>
         </section>
       </main>
+
+      <nav class="bottom-nav" aria-label="游戏功能栏">
+        <button class="nav-btn active" data-tab="lottery"><i>🎫</i><span>彩票店</span></button>
+        <button class="nav-btn" data-tab="shop"><i>🛒</i><span>商店</span></button>
+        <button class="nav-btn" data-tab="assets"><i>🏛️</i><span>资产</span></button>
+        <button class="nav-btn" data-tab="info"><i>👤</i><span>情报</span></button>
+      </nav>
     </section>
 
     <div id="choiceModal" class="modal hidden">
