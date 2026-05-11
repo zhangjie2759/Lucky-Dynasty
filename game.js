@@ -1,153 +1,3322 @@
-'use strict';
+// game.js
+// 利禄卡 Online v4.4 干净重建中英文版
+// 状态机：lobby / opening / meal_playing / meal_result / night_picking / day_result
 
-const STORAGE_KEY = 'strongLuckFamilyV6_lifeEvents';
-const START_CASH = 100000;
-const START_LUCK = 50;
-const START_HAPPY = 50;
-const MAX_TICKETS_PER_GEN = 3;
-const GRAND_THRESHOLD = 1000000;
-const MEDAL_HAPPY = 100;
+const IS_WEB = typeof window !== 'undefined' && typeof document !== 'undefined'
+const canvas = document.getElementById('gameCanvas')
+const ctx = canvas.getContext('2d')
 
-const $ = (id)=>document.getElementById(id);
-const fmt = (n)=>'¥'+Math.max(0,Math.floor(n)).toLocaleString('zh-CN');
-const clamp = (n,a,b)=>Math.max(a,Math.min(b,n));
-const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+let W = 0
+let H = 0
+let DPR = 1
+let SAFE_TOP = 18
+let SAFE_BOTTOM = 18
+let resizeRenderReady = false
 
-const NAMES = ['张大发','张金宝','张满仓','张旺财','张来福','张富贵','张锦鲤','张添财','张好运','张万利'];
-const TRAITS = [
-  {name:'野心家',desc:'总觉得下一张才是真正改命的。'},
-  {name:'顾家派',desc:'更容易从家庭型消费中获得幸福。'},
-  {name:'消费至上',desc:'中了大奖就该先让自己爽。'},
-  {name:'大善人',desc:'帮助别人会获得更多幸福，但容易被索取。'},
-  {name:'抠搜圣体',desc:'少花钱也能获得一点幸福。'},
-  {name:'赌徒脑',desc:'股票和彩票的诱惑对他特别强。'}
-];
+function getViewportSize() {
+  const vv = window.visualViewport
 
-const TICKETS = {
-  small:{name:'小福票',cost:10000,bonus:0,weights:{2:63,3:28,4:7,5:1.5,6:.4,7:.08,8:.018,9:.002},payouts:{2:8000,3:30000,4:120000,5:600000,6:1800000,7:8000000,8:30000000,9:100000000}},
-  luck:{name:'强运票',cost:30000,bonus:12,weights:{2:47,3:32,4:15,5:5,6:1.4,7:.35,8:.12,9:.03},payouts:{2:18000,3:80000,4:500000,5:2000000,6:8000000,7:30000000,8:100000000,9:500000000}},
-  rich:{name:'暴富票',cost:80000,bonus:24,weights:{2:36,3:30,4:20,5:8.8,6:3.6,7:1.2,8:.35,9:.05},payouts:{2:30000,3:150000,4:900000,5:5000000,6:20000000,7:80000000,8:300000000,9:1000000000}}
-};
+  const width = Math.floor((vv && vv.width) || window.innerWidth || document.documentElement.clientWidth || 390)
+  const height = Math.floor((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight || 780)
 
-const LIFE_CATS = [
-  {id:'travel',name:'出行'}, {id:'house',name:'住房'}, {id:'career',name:'创业'}, {id:'kind',name:'善举'}, {id:'simple',name:'简朴'}, {id:'invest',name:'投资'}
-];
-const LIFE_ITEMS = [
-  {id:'bike',cat:'travel',icon:'🚲',name:'自行车',price:1200,happy:6,pressure:-1,keep:.25,tags:['bike','simple'],text:'便宜、健康、没面子，但这一代至少能自由出门。'},
-  {id:'ebike',cat:'travel',icon:'🛵',name:'电驴',price:3500,happy:10,pressure:0,keep:.25,tags:['ebike','simple'],text:'小钱买来很大的生活半径，适合没中大奖的一代。'},
-  {id:'usedcar',cat:'travel',icon:'🚗',name:'二手车',price:60000,happy:16,pressure:3,keep:.45,tags:['car','usedcar'],text:'车不新，但第一次不用挤公交了。后续可能有维修和借车事件。'},
-  {id:'sedan',cat:'travel',icon:'🚘',name:'30万油车轿车',price:300000,happy:30,pressure:7,keep:.52,tags:['car','oilcar'],text:'稳定、体面，油费和保养会跟着来。'},
-  {id:'ev',cat:'travel',icon:'🔋',name:'30万电车',price:300000,happy:32,pressure:6,keep:.48,tags:['car','ev'],text:'科技感和低使用成本，但电池衰减会成为未来风险。'},
-  {id:'suv',cat:'travel',icon:'🚙',name:'50万SUV',price:500000,happy:42,pressure:9,keep:.5,tags:['car','suv','family'],text:'家庭幸福感很强，也更容易被亲戚朋友借车。'},
-  {id:'mpv',cat:'travel',icon:'🚐',name:'80万MPV',price:800000,happy:55,pressure:11,keep:.48,tags:['car','mpv','family'],text:'像真正开始照顾全家，但也会被全家需要。'},
-  {id:'pickup',cat:'travel',icon:'🛻',name:'40万皮卡',price:400000,happy:35,pressure:7,keep:.5,tags:['car','pickup','career'],text:'能拉货，能创业，适合务实路线。'},
-  {id:'sportscar',cat:'travel',icon:'🏎️',name:'200万跑车',price:2000000,happy:120,pressure:28,keep:.38,tags:['car','sportscar'],text:'消费至上路线的标志。爽，但维修、贬值、剐蹭都会很痛。'},
+  return {
+    width: Math.max(320, width),
+    height: Math.max(560, height)
+  }
+}
 
-  {id:'rentupgrade',cat:'house',icon:'🛏️',name:'换个好点的租房',price:30000,happy:16,pressure:1,keep:0,tags:['rent'],text:'没有资产，但这一代睡得舒服很多。'},
-  {id:'smallhome',cat:'house',icon:'🏚️',name:'50万县城小房',price:500000,happy:35,pressure:6,keep:.82,tags:['house'],text:'便宜但是真资产，能给后代一个落脚点。'},
-  {id:'cityhome',cat:'house',icon:'🏠',name:'150万普通住宅',price:1500000,happy:60,pressure:12,keep:.84,tags:['house'],text:'生活稳定感大幅提高，物业和装修也会找上门。'},
-  {id:'bigflat',cat:'house',icon:'🏢',name:'800万大平层',price:8000000,happy:170,pressure:28,keep:.86,tags:['house','luxuryhome'],text:'暴富后的梦想房，但维护成本和房价波动会放大。'},
-  {id:'villa',cat:'house',icon:'🏡',name:'5000万独栋别墅',price:50000000,happy:680,pressure:90,keep:.82,tags:['house','villa'],text:'家族传说级住房，所有亲戚都知道你有钱了。'},
+function getTargetDpr(width, height) {
+  const raw = window.devicePixelRatio || 1
+  const area = width * height
 
-  {id:'stall',cat:'career',icon:'🥤',name:'摆摊小生意',price:30000,happy:12,pressure:4,keep:.2,tags:['company','smallbiz'],text:'不用中大奖也能试试创业，赚不赚另说。'},
-  {id:'shop',cat:'career',icon:'🏪',name:'小便利店',price:300000,happy:28,pressure:12,keep:.45,tags:['company'],text:'稳定但辛苦，员工、房租和库存都会成为事件。'},
-  {id:'restaurant',cat:'career',icon:'🍜',name:'网红餐厅',price:1000000,happy:60,pressure:28,keep:.42,tags:['company','restaurant'],text:'可能火，也可能被房租和差评拖死。'},
-  {id:'brand',cat:'career',icon:'🧢',name:'潮流品牌',price:6000000,happy:150,pressure:45,keep:.45,tags:['company','brand'],text:'很适合炫耀，但现金流非常脆弱。'},
+  // iPhone 17 Pro / Pro Max 一类设备 CSS 视口更大、DPR 更高。
+  // 如果继续用 DPR=2 或 3，Canvas 实际像素会很重，容易变形和卡。
+  if (raw >= 3 && area > 380000) return 1.45
+  if (raw >= 3 && area > 330000) return 1.65
 
-  {id:'familymeal',cat:'kind',icon:'🥘',name:'请全家吃顿好的',price:3000,happy:18,pressure:0,keep:0,tags:['kind','family'],text:'不贵，但这一代真的开心过。'},
-  {id:'parents',cat:'kind',icon:'🧧',name:'给父母大红包',price:50000,happy:45,pressure:2,keep:0,tags:['kind','family'],text:'幸福和家庭关系大幅提高，也可能让亲友开始期待你更多付出。'},
-  {id:'charity',cat:'kind',icon:'❤️',name:'捐助困难家庭',price:100000,happy:70,pressure:3,keep:0,tags:['kind','charity'],text:'大善人路线。名声和幸福提高，但后续可能被更多人求助。'},
-  {id:'school',cat:'kind',icon:'🏫',name:'资助乡村小学',price:1000000,happy:260,pressure:10,keep:0,tags:['kind','charity'],text:'花掉很多钱，但这件事会成为家族荣光。'},
+  return Math.min(raw, 1.85)
+}
 
-  {id:'savecash',cat:'simple',icon:'🥣',name:'继续吃家常饭',price:500,happy:4,pressure:-2,keep:0,tags:['simple'],text:'很抠搜，但压力下降。'},
-  {id:'repairhome',cat:'simple',icon:'🔧',name:'修旧家具',price:8000,happy:14,pressure:-1,keep:0,tags:['simple'],text:'没那么体面，却很踏实。'},
-  {id:'health',cat:'simple',icon:'🏃',name:'办健身卡',price:5000,happy:18,pressure:-2,keep:0,tags:['simple','health'],text:'幸福不只来自花大钱。'},
-  {id:'deposit',cat:'simple',icon:'🏦',name:'存一笔活期备用金',price:50000,happy:8,pressure:-8,keep:.95,tags:['simple','cashsafe'],text:'几乎不爽，但下一代可能感谢你。'},
+function resizeCanvas(force) {
+  const size = getViewportSize()
+  const nextW = size.width
+  const nextH = size.height
+  const nextDpr = getTargetDpr(nextW, nextH)
 
-  {id:'stockconservative',cat:'invest',icon:'📊',name:'股票策略：保守长线',price:30000,happy:6,pressure:3,keep:1,tags:['stock','conservative'],text:'每代波动较小，作为现金放大器。'},
-  {id:'stockbalanced',cat:'invest',icon:'📈',name:'股票策略：均衡配置',price:100000,happy:12,pressure:8,keep:1,tags:['stock','balanced'],text:'有机会赚钱，也可能亏。'},
-  {id:'stockaggressive',cat:'invest',icon:'🚀',name:'股票策略：激进短线',price:300000,happy:25,pressure:20,keep:1,tags:['stock','aggressive'],text:'前期新手最容易被它教育。'},
-  {id:'memeStock',cat:'invest',icon:'🎰',name:'梭哈妖股',price:800000,happy:60,pressure:45,keep:1,tags:['stock','meme'],text:'可能一代翻身，也可能直接把家族送去上班。'}
-];
+  if (!force && W === nextW && H === nextH && Math.abs(DPR - nextDpr) < 0.01) return
 
-const EVENT_POOL = [
-  {type:'bad',tags:['car'],title:'朋友借车',text:'朋友说接亲缺辆车，想借你的车撑场面。',choices:[['借给他',{happy:8,pressure:5,chanceDamage:.45},'关系开心，但可能剐蹭'],['拒绝',{happy:-3,pressure:-2},'保住车，也保住边界']]},
-  {type:'bad',tags:['usedcar','car'],title:'变速箱异响',text:'二手车开着开着开始抖，修理厂报价让你沉默。',choices:[['咬牙维修',{cash:-18000,pressure:6},'现金减少'],['先拖着',{happy:-8,pressure:10},'车况继续恶化']]},
-  {type:'bad',tags:['ev'],title:'电池衰减',text:'电车续航明显缩水，二手商压价很狠。',choices:[['接受贬值',{assetDrop:.18,pressure:5},'车辆估值下降'],['换新电池',{cash:-45000,happy:6},'现金减少']]},
-  {type:'good',tags:['suv','mpv','family'],title:'全家自驾',text:'周末你把一家人塞进车里，去了郊外。车不便宜，但这一刻很值。',choices:[['记住这天',{happy:26,pressure:-3},'幸福提升']]},
-  {type:'bad',tags:['house'],title:'装修超支',text:'装修队说水电、柜子、地板都要升级。你发现买房只是开始。',choices:[['继续装好点',{cash:-80000,happy:12,pressure:8},'幸福和压力一起涨'],['能住就行',{happy:-5,pressure:-2},'省钱但遗憾']]},
-  {type:'bad',tags:['house'],title:'房价下跌',text:'附近新盘降价，你的房子估值跟着掉。',choices:[['忍住不卖',{assetDrop:.12,pressure:8},'资产估值下降'],['立刻卖掉一套',{forceSell:'house'},'回收现金']]},
-  {type:'good',tags:['house'],title:'地段突然火了',text:'新地铁规划公布，家族房产估值上涨。',choices:[['继续持有',{assetRise:.16,happy:10},'资产估值上升']]},
-  {type:'bad',tags:['company'],title:'现金流断裂',text:'公司账上钱不够发工资，员工开始慌。',choices:[['注资续命',{cash:-120000,pressure:12},'现金减少'],['裁员止血',{happy:-12,pressure:5},'幸福下降']]},
-  {type:'good',tags:['company'],title:'突然爆单',text:'一个短视频把你的生意带火，订单突然暴增。',choices:[['扩张',{cash:160000,pressure:10,happy:12},'赚钱但压力上升'],['稳住',{cash:60000,pressure:-2},'小赚']]},
-  {type:'bad',tags:['stock'],title:'高收益群聊',text:'有人拉你进“内部消息群”，群里每天都有人晒收益。',choices:[['跟一把',{stockCrash:.45,pressure:18},'很可能被教育'],['退群',{pressure:-5,luck:2},'少赚也少坑']]},
-  {type:'bad',tags:['stock','aggressive','meme'],title:'妖股天地板',text:'早上还在涨停，下午突然跌停，群里没人说话了。',choices:[['认亏',{stockCrash:.55,pressure:24,happy:-20},'股票大跌'],['加仓搏反弹',{stockCrash:.8,luck:8,pressure:35},'极高风险']]},
-  {type:'good',tags:['stock'],title:'长线回血',text:'你没乱动，市场自己慢慢修复了一点。',choices:[['继续拿着',{stockRise:.12,happy:8},'股票上涨']]},
-  {type:'bad',tags:['kind','charity'],title:'被道德绑架',text:'你做过善事后，越来越多人来找你帮忙。',choices:[['继续帮',{cash:-50000,happy:18,pressure:12},'大善人路线'],['设立边界',{happy:-4,pressure:-8},'压力下降']]},
-  {type:'bad',tags:['cashhigh'],title:'家族办公室顾问',text:'一位顾问承诺“低风险年化40%”，办公室很豪华，合同却很模糊。',choices:[['投一笔',{cash:-200000,pressure:18,luck:8},'大概率是教训'],['拒绝',{pressure:-6},'保住现金']]},
-  {type:'bad',tags:['cashhigh'],title:'假古董拍卖',text:'有人说你刚好有收藏缘，花几十万就能拿下“潜力传家宝”。',choices:[['买下',{cash:-300000,happy:10,pressure:14},'大概率不值钱'],['不碰',{luck:2},'少一个坑']]},
-  {type:'bad',tags:['cashlow'],title:'彩票钱危机',text:'现金快不够买彩票了。你第一次认真思考：资产和现金不是一回事。',choices:[['卖点东西',{pressure:4},'去资产页变卖'],['硬撑',{happy:-8,pressure:10},'压力上升']]},
-  {type:'good',tags:['simple'],title:'省钱圣体',text:'你发现低成本生活也有一种安稳幸福。',choices:[['继续朴素',{happy:18,pressure:-8,luck:2},'极致简朴路线']]},
-  {type:'good',tags:['any'],title:'平凡的一天',text:'没有暴富，没有暴雷。只是吃了一顿热饭，睡了个好觉。',choices:[['这也不错',{happy:10,pressure:-4},'幸福提升']]}
-];
+  W = nextW
+  H = nextH
+  DPR = nextDpr
 
-let state, currentTicket=null, currentLifeCat='travel', scratch={isDown:false,ctx:null,canvas:null,rect:null,checked:false,locked:false,pendingPrize:null,lastMeasure:0}, impulseTimer=null;
+  const vv = window.visualViewport
+  SAFE_TOP = Math.max(18, Math.round(((vv && vv.offsetTop) || 0) + 18))
+  SAFE_BOTTOM = Math.max(18, H < 700 ? 14 : 18)
 
-function makeHeir(){return {name:pick(NAMES),trait:pick(TRAITS),avatar:pick(['🧧','👑','🍀','💰','🎲','🐲','🏮','💎'])};}
-function freshState(){const heir=makeHeir();return {generation:1,heir,cash:START_CASH,luck:START_LUCK,happy:START_HAPPY,pressure:10,medals:0,ticketsLeft:MAX_TICKETS_PER_GEN,totalGrandWins:0,assets:[],logs:[`第1代「${heir.name}」拿着10万元走进彩票店。`],lessons:[],activeTab:'lottery',impulseLeft:0};}
-function normalize(s){if(!s)return freshState();s.heir=s.heir||makeHeir();s.assets=s.assets||[];s.logs=s.logs||[];s.lessons=s.lessons||[];s.activeTab=s.activeTab||'lottery';return s;}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
-function load(){try{return normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));}catch(e){return null;}}
-function addLog(t){state.logs.unshift(t);state.logs=state.logs.slice(0,28);renderLog();}
-function showStart(){$('startScreen').classList.remove('hidden');$('gameScreen').classList.add('hidden');$('endScreen').classList.add('hidden');$('continueBtn').classList.toggle('hidden',!load());}
-function showGame(){$('startScreen').classList.add('hidden');$('gameScreen').classList.remove('hidden');$('endScreen').classList.add('hidden');renderAll();switchTab(state.activeTab||'lottery',false);}
-function renderAll(){renderStats();renderTickets();renderLifeTabs();renderLifeList();renderAssets();renderProfile();renderLog();renderWorkPanel();save();}
-function renderStats(){$('generationText').textContent=state.generation;$('heirNameText').textContent=state.heir.name;$('cashText').textContent=fmt(state.cash);$('luckText').textContent=Math.round(state.luck);$('happyText').textContent=Math.round(state.happy);$('pressureText').textContent=Math.round(state.pressure);$('medalText').textContent=state.medals;$('ticketsLeftText').textContent=state.ticketsLeft;}
-function switchTab(tab,doSave=true){const views={lottery:'lotteryView',life:'lifeView',assets:'assetsView',family:'familyView'};if(state.impulseLeft>0&&tab!=='life')tab='life';Object.values(views).forEach(id=>$(id).classList.add('hidden'));$(views[tab]).classList.remove('hidden');document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));state.activeTab=tab;if(doSave)save();if(tab==='lottery'&&currentTicket&&!scratch.checked&&!scratch.ctx)requestAnimationFrame(setupScratchCard);}
+  canvas.style.width = `${W}px`
+  canvas.style.height = `${H}px`
+  canvas.width = Math.max(1, Math.floor(W * DPR))
+  canvas.height = Math.max(1, Math.floor(H * DPR))
 
-function renderTickets(){document.querySelectorAll('.ticket-btn').forEach(btn=>{const t=TICKETS[btn.dataset.type];btn.disabled=state.cash<t.cost||state.ticketsLeft<=0||!!currentTicket||state.impulseLeft>0;});$('nextGenerationBtn').disabled=!!currentTicket||state.impulseLeft>0;$('openLifeBtn').classList.toggle('hidden',state.totalGrandWins<=0&&!state.cash>GRAND_THRESHOLD);}
-function randomCode(){let s='';for(let i=0;i<9;i++)s+=Math.floor(Math.random()*10);return s;}function formatCode(c){return c.replace(/(\d{3})(\d{3})(\d{3})/,'$1 $2 $3');}
-function chooseTailMatch(ticket){const luck=clamp(state.luck+ticket.bonus-state.pressure*.2,0,120),lf=(luck-50)/70;const entries=Object.entries(ticket.weights).map(([m,w])=>[Number(m),w*clamp(1+lf*(Number(m)-2)*.42,.2,4.2)]);let r=Math.random()*entries.reduce((a,[,w])=>a+w,0);for(const [m,w] of entries){r-=w;if(r<=0)return m;}return 2;}
-function makePlayerCode(win,match){if(match>=9)return win;const arr=randomCode().split(''),start=9-match;for(let i=start;i<9;i++)arr[i]=win[i];if(start-1>=0&&arr[start-1]===win[start-1])arr[start-1]=String((Number(win[start-1])+1+Math.floor(Math.random()*9))%10);return arr.join('');}
-function startTicket(type){const t=TICKETS[type];if(!t||state.cash<t.cost||state.ticketsLeft<=0||currentTicket)return;state.cash-=t.cost;state.ticketsLeft--;const win=randomCode(),match=chooseTailMatch(t),code=makePlayerCode(win,match),prize=t.payouts[match]||0;currentTicket={type,name:t.name,winningCode:win,playerCode:code,tailMatch:match,prize};$('currentTicketName').textContent=t.name;$('winningCodeText').textContent=formatCode(win);$('playerCodeText').textContent=formatCode(code);$('playerCodeText').classList.remove('matched');$('matchHintText').textContent='刮开后自动验奖';$('ticketChooser').classList.add('hidden');$('scratchArea').classList.remove('hidden');$('checkTicketBtn').disabled=false;scratch.ctx=null;addLog(`买下「${t.name}」，刮开9位强运码。`);renderAll();switchTab('lottery');requestAnimationFrame(setupScratchCard);}
-function setupScratchCard(){scratch.canvas=$('scratchCanvas');scratch.ctx=scratch.canvas.getContext('2d',{willReadFrequently:true});scratch.checked=false;scratch.locked=false;scratch.pendingPrize=null;scratch.lastMeasure=0;if(!resizeScratchCanvas()){setTimeout(setupScratchCard,80);return;}paintScratchLayer();}
-function resizeScratchCanvas(){const stage=$('scratchStage'),box=stage.getBoundingClientRect();let w=box.width||stage.clientWidth,h=box.height||stage.clientHeight||210;if(!w||w<40)return false;const dpr=Math.max(1,Math.min(devicePixelRatio||1,3));scratch.rect={width:w,height:h};scratch.canvas.width=Math.floor(w*dpr);scratch.canvas.height=Math.floor(h*dpr);scratch.canvas.style.width=w+'px';scratch.canvas.style.height=h+'px';scratch.ctx.setTransform(dpr,0,0,dpr,0,0);return true;}
-function paintScratchLayer(){const ctx=scratch.ctx,w=scratch.rect.width,h=scratch.rect.height;ctx.save();ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,w,h);let g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,'#f6f4ee');g.addColorStop(.25,'#aaa398');g.addColorStop(.55,'#d9d4ca');g.addColorStop(1,'#8f897f');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);ctx.globalAlpha=.18;for(let i=0;i<650;i++){ctx.fillStyle=Math.random()>.5?'#fff':'#4f4a43';ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h,Math.random()*1.7+.35,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;ctx.fillStyle='rgba(36,24,12,.62)';ctx.font='900 20px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('刮开你的9位强运码',w/2,h/2-10);ctx.font='800 13px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif';ctx.fillText('尾号越多，奖金越大',w/2,h/2+22);ctx.restore();}
-function scratchAt(cx,cy){if(!currentTicket||scratch.locked||scratch.checked||!scratch.ctx)return;const rect=scratch.canvas.getBoundingClientRect(),x=cx-rect.left,y=cy-rect.top;if(x<-30||y<-30||x>rect.width+30||y>rect.height+30)return;const radius=Math.max(24,Math.min(42,rect.width*.075));scratch.ctx.save();scratch.ctx.globalCompositeOperation='destination-out';scratch.ctx.beginPath();scratch.ctx.arc(x,y,radius,0,Math.PI*2);scratch.ctx.fill();scratch.ctx.restore();const now=performance.now();if(now-scratch.lastMeasure>150){scratch.lastMeasure=now;const p=measureScratchPercent();$('matchHintText').textContent=`已刮开 ${Math.min(99,Math.round(p*100))}%`;if(p>=.62)checkTicket();}}
-function measureScratchPercent(){const data=scratch.ctx.getImageData(0,0,scratch.canvas.width,scratch.canvas.height).data;let clear=0,total=0;for(let i=3;i<data.length;i+=80){total++;if(data[i]<90)clear++;}return total?clear/total:0;}function clearScratchLayer(){scratch.ctx.save();scratch.ctx.globalCompositeOperation='destination-out';scratch.ctx.fillRect(0,0,scratch.rect.width,scratch.rect.height);scratch.ctx.restore();}
-function checkTicket(){if(!currentTicket||scratch.checked)return;scratch.checked=true;scratch.locked=true;clearScratchLayer();$('checkTicketBtn').disabled=true;$('playerCodeText').classList.add('matched');const m=currentTicket.tailMatch,p=currentTicket.prize,label=m>=9?'9位全中':`尾${m}位相同`;$('matchHintText').textContent=`${label} · ${fmt(p)}`;scratch.pendingPrize={amount:p,match:m};setTimeout(()=>showPrizeChoice(p,m),240);}
-function showPrizeChoice(amount,match){const grand=amount>=GRAND_THRESHOLD;$('modalIcon').textContent=grand?'🏆':'🎉';$('modalTitle').textContent=`${match>=9?'9位全中':'尾'+match+'位中奖'}：${fmt(amount)}`;$('modalText').textContent=grand?'这笔钱足够进入暴富冲动时间。兑现拿钱，不兑现保留大运。':'兑现拿小钱，不兑现保留强运搏后面。';$('cashOutBtn').textContent=`兑现 ${fmt(amount)}`;$('keepLuckBtn').textContent=`不兑现，强运+${keepLuckGain(amount,match)}`;$('choiceModal').classList.remove('hidden');}
-function cashOutPrize(){const r=scratch.pendingPrize;if(!r)return;state.cash+=r.amount;const loss=clamp(Math.round(r.match*3+r.amount/180000),6,55);state.luck=clamp(state.luck-loss,0,120);addLog(`兑现${fmt(r.amount)}，强运消耗${loss}点。`);const grand=r.amount>=GRAND_THRESHOLD;if(grand){state.totalGrandWins++;startImpulse();}closeChoice();postAction('lottery');if(grand)setTimeout(()=>switchTab('life'),300);}function keepLuckPrize(){const r=scratch.pendingPrize;if(!r)return;const gain=keepLuckGain(r.amount,r.match);state.luck=clamp(state.luck+gain,0,120);addLog(`放弃${fmt(r.amount)}，强运+${gain}。`);closeChoice();postAction('lottery');}function keepLuckGain(a,m){return clamp(Math.round(6+m*2+Math.min(a/1000000,10)),10,32);}function closeChoice(){$('choiceModal').classList.add('hidden');finishTicketWithoutConfirm();renderAll();}
-function finishTicket(){if(!currentTicket)return;if(!scratch.checked&&!confirm('这张还没验奖，确定放弃吗？'))return;finishTicketWithoutConfirm();renderAll();}function finishTicketWithoutConfirm(){currentTicket=null;scratch.checked=false;scratch.locked=false;scratch.pendingPrize=null;scratch.ctx=null;$('scratchArea').classList.add('hidden');$('ticketChooser').classList.remove('hidden');}
-function startImpulse(){state.impulseLeft=30;addLog('暴富冲动时间开始：30秒内只想消费。');clearInterval(impulseTimer);impulseTimer=setInterval(()=>{state.impulseLeft--;renderImpulse();if(state.impulseLeft<=0){clearInterval(impulseTimer);state.impulseLeft=0;addLog('暴富冲动结束，进入冷静生活。');renderAll();}},1000);renderImpulse();}
-function renderImpulse(){$('impulseBar').classList.toggle('hidden',state.impulseLeft<=0);$('impulseText').textContent=state.impulseLeft;document.querySelectorAll('.nav-btn').forEach(b=>{if(state.impulseLeft>0)b.disabled=b.dataset.tab!=='life';else b.disabled=false;});save();}
+  // 关键：用 setTransform 重置矩阵，避免 resize 后重复 scale 造成画面变形。
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'medium'
 
-function renderLifeTabs(){const box=$('lifeTabs');box.innerHTML=LIFE_CATS.map(c=>`<button class="life-tab ${c.id===currentLifeCat?'active':''}" data-life="${c.id}">${c.name}</button>`).join('');box.querySelectorAll('.life-tab').forEach(b=>b.onclick=()=>{currentLifeCat=b.dataset.life;renderLifeTabs();renderLifeList();});renderImpulse();}
-function renderLifeList(){const list=$('lifeList');list.innerHTML=LIFE_ITEMS.filter(i=>i.cat===currentLifeCat).map(i=>`<button class="life-item" data-buy="${i.id}" ${state.cash<i.price?'disabled':''}><b>${i.icon} ${i.name}</b><span class="life-price">${fmt(i.price)}</span><div class="life-meta"><i>幸福 +${i.happy}</i><i>压力 ${i.pressure>=0?'+':''}${i.pressure}</i><i>保值 ${Math.round((i.keep||0)*100)}%</i></div><small>${i.text}</small></button>`).join('');list.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>buyLife(b.dataset.buy));}
-function buyLife(id){const item=LIFE_ITEMS.find(i=>i.id===id);if(!item||state.cash<item.price)return;state.cash-=item.price;state.happy=clamp(state.happy+item.happy,0,9999);state.pressure=clamp(state.pressure+item.pressure,0,9999);if(item.keep>0){state.assets.push({id:Date.now()+Math.random(),baseId:item.id,name:item.name,icon:item.icon,cat:item.cat,tags:item.tags||[],buy:item.price,value:Math.floor(item.price*item.keep),keep:item.keep});}if(item.tags&&item.tags.includes('stock')){state.assets.push({id:Date.now()+Math.random(),baseId:item.id,name:item.name,icon:item.icon,cat:'stock',tags:item.tags,buy:item.price,value:item.price,keep:1});}addLog(`消费：${item.name}，幸福+${item.happy}，压力${item.pressure>=0?'+':''}${item.pressure}。`);renderAll();postAction('buy',item);}
+  if (resizeRenderReady && typeof requestRender === 'function') {
+    requestRender()
+  }
+}
 
-function renderAssets(){const value=assetValue();$('assetSummary').innerHTML=`<div class="summary-box"><span>净资产</span><strong>${fmt(value+state.cash)}</strong></div><div class="summary-box"><span>资产估值</span><strong>${fmt(value)}</strong></div><div class="summary-box"><span>资产数量</span><strong>${state.assets.length}</strong></div>`;$('assetList').innerHTML=state.assets.length?state.assets.map(a=>`<div class="asset-item"><div class="asset-row"><div><b>${a.icon} ${a.name}</b><small>买入 ${fmt(a.buy)} · 当前估值 ${fmt(a.value)} · 标签 ${(a.tags||[]).join('/')}</small></div></div><div class="asset-actions"><button class="sell-btn" data-sell="${a.id}">变卖 ${fmt(a.value*.9)}</button></div></div>`).join(''):'<p>还没有资产。中彩票后先去生活里买点未来。</p>';$('assetList').querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>sellAsset(b.dataset.sell));}
-function sellAsset(id){const idx=state.assets.findIndex(a=>String(a.id)===String(id));if(idx<0)return;const a=state.assets[idx];state.cash+=Math.floor(a.value*.9);state.assets.splice(idx,1);state.pressure=clamp(state.pressure+3,0,9999);addLog(`变卖「${a.name}」，换回${fmt(a.value*.9)}。`);renderAll();postAction('sell',a);}
-function assetValue(){return state.assets.reduce((s,a)=>s+a.value,0);}function stockValue(){return state.assets.filter(a=>a.cat==='stock').reduce((s,a)=>s+a.value,0);}
-function settleAssets(){state.assets.forEach(a=>{let rate=0;if(a.cat==='stock'){if(a.tags.includes('conservative'))rate=rand(-.05,.08);else if(a.tags.includes('balanced'))rate=rand(-.15,.2);else if(a.tags.includes('aggressive'))rate=rand(-.4,.6);else rate=rand(-.9,2);}else if(a.tags.includes('house'))rate=rand(-.1,.16);else if(a.tags.includes('car'))rate=rand(-.18,-.05);else if(a.cat==='career')rate=rand(-.25,.25);else rate=rand(-.08,.08);a.value=Math.max(0,Math.floor(a.value*(1+rate)));});}
-function rand(a,b){return Math.random()*(b-a)+a;}
+resizeCanvas(true)
 
-function renderProfile(){const route=state.happy>120?'幸福爆棚':state.pressure>90?'压力爆炸':state.medals>8?'快乐传家':'强运试炼';$('profileCard').innerHTML=`<div class="profile-main"><div class="avatar">${state.heir.avatar}</div><div><h3>${state.heir.name}</h3><p>第${state.generation}代 · ${state.heir.trait.name} · ${route}</p></div></div><p>${state.heir.trait.desc}</p><div class="profile-grid"><div><span>现金</span><strong>${fmt(state.cash)}</strong></div><div><span>资产</span><strong>${fmt(assetValue())}</strong></div><div><span>股票</span><strong>${fmt(stockValue())}</strong></div><div><span>买票机会</span><strong>${state.ticketsLeft}</strong></div></div>`;}
-function renderLog(){$('logList').innerHTML=state.logs.map(l=>`<div class="log-item">${l}</div>`).join('');}
-function renderWorkPanel(){const broke=state.cash<TICKETS.small.cost&&assetValue()<TICKETS.small.cost;$('workEndPanel').classList.toggle('hidden',!broke);}
+const TOTAL_ORDERS_PER_DAY = 10
 
-function postAction(ctx,item){const risk=eventChance(ctx,item);if(Math.random()>risk)return;const ev=selectEvent(item);showEvent(ev);}
-function eventChance(ctx,item){let c=.18;if(state.generation<=3)c+=.28;if(ctx==='buy')c+=.2;if(ctx==='next')c+=.25;if(ctx==='sell')c+=.12;if(item&&item.tags&&item.tags.includes('stock'))c+=.25;if(state.cash>500000)c+=.08;if(state.cash<TICKETS.luck.cost)c+=.18;return clamp(c,0,.82);}
-function selectEvent(item){const tags=new Set(['any']);if(item&&item.tags)(item.tags).forEach(t=>tags.add(t));state.assets.forEach(a=>(a.tags||[]).forEach(t=>tags.add(t)));if(state.cash>500000)tags.add('cashhigh');if(state.cash<TICKETS.luck.cost)tags.add('cashlow');let pool=EVENT_POOL.filter(e=>e.tags.some(t=>tags.has(t)));if(!pool.length)pool=EVENT_POOL.filter(e=>e.tags.includes('any'));if(state.generation<=3){const risky=pool.filter(e=>e.type==='bad');if(risky.length&&Math.random()<.72)pool=risky;}return pick(pool);}
-function showEvent(ev){$('eventIcon').textContent=ev.type==='bad'?'⚠️':'🍀';$('eventTitle').textContent=ev.title;$('eventText').textContent=ev.text;$('eventChoices').innerHTML=ev.choices.map((c,i)=>`<button class="event-choice" data-event-choice="${i}">${c[0]}<small>${c[2]||''}</small></button>`).join('');$('eventChoices').querySelectorAll('[data-event-choice]').forEach(b=>b.onclick=()=>applyEventChoice(ev,Number(b.dataset.eventChoice)));$('eventModal').classList.remove('hidden');}
-function applyEventChoice(ev,i){const [label,effect]=ev.choices[i];applyEffect(effect);$('eventModal').classList.add('hidden');$('eventCard').classList.remove('hidden');$('eventCard').innerHTML=`<h3>${ev.title}</h3><p>选择：${label}</p>`;addLog(`事件「${ev.title}」：${label}。`);renderAll();}
-function applyEffect(e={}){if(e.cash)state.cash=Math.max(0,state.cash+e.cash);if(e.happy)state.happy=clamp(state.happy+e.happy,0,9999);if(e.pressure)state.pressure=clamp(state.pressure+e.pressure,0,9999);if(e.luck)state.luck=clamp(state.luck+e.luck,0,120);if(e.assetDrop)state.assets.forEach(a=>{a.value=Math.floor(a.value*(1-e.assetDrop));});if(e.assetRise)state.assets.forEach(a=>{a.value=Math.floor(a.value*(1+e.assetRise));});if(e.stockCrash)state.assets.filter(a=>a.cat==='stock').forEach(a=>a.value=Math.floor(a.value*(1-e.stockCrash)));if(e.stockRise)state.assets.filter(a=>a.cat==='stock').forEach(a=>a.value=Math.floor(a.value*(1+e.stockRise)));if(e.chanceDamage&&Math.random()<e.chanceDamage){const car=state.assets.find(a=>(a.tags||[]).includes('car'));if(car){car.value=Math.floor(car.value*.82);state.pressure+=6;addLog('借车后出现剐蹭，车辆估值下降。');}}if(e.forceSell){const idx=state.assets.findIndex(a=>(a.tags||[]).includes(e.forceSell));if(idx>=0){const a=state.assets[idx];state.cash+=Math.floor(a.value*.85);state.assets.splice(idx,1);}}}
+const meals = [
+  { name: '早餐', threshold: 400 },
+  { name: '午餐', threshold: 800 },
+  { name: '晚餐', threshold: 600 },
+  { name: '夜宵', threshold: 800 }
+]
 
-function nextGeneration(){if(currentTicket){switchTab('lottery');return;}if(state.cash<TICKETS.small.cost&&assetValue()<TICKETS.small.cost){renderWorkPanel();switchTab('lottery');return;}const medals=Math.floor(state.happy/MEDAL_HAPPY);if(medals>0){state.medals+=medals;addLog(`本代幸福${Math.round(state.happy)}，兑换${medals}枚快乐勋章。`);}settleAssets();const prev=state.generation,oldCash=state.cash;state.generation++;state.heir=makeHeir();state.ticketsLeft=MAX_TICKETS_PER_GEN;state.happy=clamp(45+state.medals*2-state.pressure*.12,10,120);state.pressure=clamp(state.pressure*.45,0,9999);state.luck=clamp(Math.round(state.luck*.45+18+state.medals*.8),8,115);addLog(`第${prev}代把${fmt(oldCash)}和${state.assets.length}件资产传给第${state.generation}代「${state.heir.name}」。`);renderAll();switchTab('lottery');postAction('next');}
-function endGame(){const score=state.medals*1000000+assetValue()+state.cash+state.generation*100000;const grade=score>100000000?'强运神话':score>30000000?'豪门余梦':score>5000000?'小富之家':'普通家庭';$('gameScreen').classList.add('hidden');$('endScreen').classList.remove('hidden');$('endingTitle').textContent='结束强运世代，去上班';$('endingText').textContent=`第${state.generation}代买不起彩票了。家族评级：「${grade}」。最大的悲剧不是破产，是恢复正常上班。`;$('endingStats').innerHTML=`<div><span>延续世代</span><strong>${state.generation}</strong></div><div><span>最终现金</span><strong>${fmt(state.cash)}</strong></div><div><span>资产估值</span><strong>${fmt(assetValue())}</strong></div><div><span>快乐勋章</span><strong>${state.medals}</strong></div>`;localStorage.removeItem(STORAGE_KEY);}
+const FOOD_CARDS = [
+  { name: '生菜沙拉', english: 'Salad', type: '素', kcal: 30 },
+  { name: '西兰花', english: 'Broccoli', type: '素', kcal: 50 },
+  { name: '牛油果', english: 'Avocado', type: '素', kcal: 80 },
+  { name: '炒藕片', english: 'Lotus Root', type: '素', kcal: 80 },
+  { name: '烤黄金香菇', english: 'Grilled Golden', type: '素', kcal: 60 },
+  { name: '臭豆腐', english: 'Stinky Tofu', type: '素', kcal: 150 },
 
-function getPoint(e){if(e.touches&&e.touches.length)return{x:e.touches[0].clientX,y:e.touches[0].clientY};if(e.changedTouches&&e.changedTouches.length)return{x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};return{x:e.clientX,y:e.clientY};}
-function bindScratchInput(){const canvas=$('scratchCanvas'),start=e=>{if(!currentTicket||scratch.locked||scratch.checked)return;e.preventDefault();scratch.isDown=true;if(e.pointerId!==undefined&&canvas.setPointerCapture){try{canvas.setPointerCapture(e.pointerId);}catch(_){}}const p=getPoint(e);scratchAt(p.x,p.y);},move=e=>{if(!scratch.isDown)return;e.preventDefault();const p=getPoint(e);scratchAt(p.x,p.y);},end=e=>{if(scratch.isDown&&e)e.preventDefault();scratch.isDown=false;};if('PointerEvent'in window){['pointerdown'].forEach(ev=>canvas.addEventListener(ev,start,{passive:false}));['pointermove'].forEach(ev=>canvas.addEventListener(ev,move,{passive:false}));['pointerup','pointercancel','pointerleave'].forEach(ev=>canvas.addEventListener(ev,end,{passive:false}));}else{canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',end,{passive:false});canvas.addEventListener('mousedown',start,{passive:false});window.addEventListener('mousemove',move,{passive:false});window.addEventListener('mouseup',end,{passive:false});}}
-function bindEvents(){$('startBtn').onclick=()=>{state=freshState();save();showGame();};$('continueBtn').onclick=()=>{state=load()||freshState();showGame();};$('resetBtn').onclick=()=>{if(!confirm('确定重开这个家族吗？'))return;localStorage.removeItem(STORAGE_KEY);currentTicket=null;state=freshState();showGame();};$('playAgainBtn').onclick=()=>{state=freshState();save();showGame();};document.querySelectorAll('.ticket-btn').forEach(b=>b.onclick=()=>startTicket(b.dataset.type));document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));$('finishTicketBtn').onclick=finishTicket;$('checkTicketBtn').onclick=checkTicket;$('cashOutBtn').onclick=cashOutPrize;$('keepLuckBtn').onclick=keepLuckPrize;$('nextGenerationBtn').onclick=nextGeneration;$('openLifeBtn').onclick=()=>switchTab('life');$('goWorkBtn').onclick=endGame;bindScratchInput();window.addEventListener('resize',()=>{if(currentTicket&&state.activeTab==='lottery'&&!scratch.checked)setupScratchCard();});}
-function boot(){bindEvents();showStart();}
-boot();
+  { name: '水煮蛋', english: 'Boiled Egg', type: '荤', kcal: 100 },
+  { name: '烤生蚝', english: 'Grilled Oyster', type: '荤', kcal: 120 },
+  { name: '烤鸡翅', english: 'Chicken Wing', type: '荤', kcal: 160 },
+  { name: '烤鱿鱼', english: 'Grilled Squid', type: '荤', kcal: 160 },
+  { name: '炸鸡', english: 'Fried Chicken', type: '荤', kcal: 220 },
+  { name: '羊肉串', english: 'Lamb Skewer', type: '荤', kcal: 180 },
+
+  { name: '米饭', english: 'Rice Bowl', type: '主食', kcal: 150 },
+  { name: '牛肉面', english: 'Beef Noodles', type: '主食', kcal: 200 },
+  { name: '饺子', english: 'Dumpling', type: '主食', kcal: 180 },
+  { name: '包子', english: 'Baozi', type: '主食', kcal: 180 },
+  { name: '披萨片', english: 'Pizza Slice', type: '主食', kcal: 220 },
+  { name: '咖喱饭', english: 'Curry Rice', type: '主食', kcal: 250 },
+
+  { name: '酸奶', english: 'Yogurt', type: '甜点', kcal: 80 },
+  { name: '布丁', english: 'Pudding', type: '甜点', kcal: 250 },
+  { name: '珍珠奶茶', english: 'Milk Tea', type: '甜点', kcal: 260 },
+  { name: '冰淇淋', english: 'Ice Cream', type: '甜点', kcal: 300 },
+  { name: '瑞士卷', english: 'Swiss Roll', type: '甜点', kcal: 260 },
+  { name: '融化蛋糕', english: 'Cake Ooze', type: '甜点', kcal: 350 }
+]
+
+const CARD_IMAGE_PATHS = {
+  '生菜沙拉': 'images/cards/salad.png',
+  '西兰花': 'images/cards/broccoli.png',
+  '牛油果': 'images/cards/avocado.png',
+  '炒藕片': 'images/cards/lotus_root.png',
+  '烤黄金香菇': 'images/cards/grilled_golden.png',
+  '臭豆腐': 'images/cards/stinky_tofu.png',
+
+  '水煮蛋': 'images/cards/boiled_egg.png',
+  '烤生蚝': 'images/cards/grilled_oyster.png',
+  '烤鸡翅': 'images/cards/chicken_wing.png',
+  '烤鱿鱼': 'images/cards/grilled_squid.png',
+  '炸鸡': 'images/cards/fried_chicken.png',
+  '羊肉串': 'images/cards/lamb_skewer.png',
+
+  '米饭': 'images/cards/rice_bowl.png',
+  '牛肉面': 'images/cards/beef_noodles.png',
+  '饺子': 'images/cards/dumpling.png',
+  '包子': 'images/cards/baozi.png',
+  '披萨片': 'images/cards/pizza_slice.png',
+  '咖喱饭': 'images/cards/curry_rice.png',
+
+  '酸奶': 'images/cards/yogurt.png',
+  '布丁': 'images/cards/pudding.png',
+  '珍珠奶茶': 'images/cards/milk_tea.png',
+  '冰淇淋': 'images/cards/ice_cream.png',
+  '瑞士卷': 'images/cards/swiss_roll.png',
+  '融化蛋糕': 'images/cards/cake.png'
+}
+
+const CARD_BACK_PATHS = {
+  '荤': 'images/cards/red_back.png',
+  '素': 'images/cards/green_back.png',
+  '主食': 'images/cards/yellow_back.png',
+  '甜点': 'images/cards/blue_back.png'
+}
+
+
+const TYPE_COLORS = {
+  '荤': '#FF9BB4',
+  '素': '#A9F0D1',
+  '主食': '#FFE169',
+  '甜点': '#9EDBFF'
+}
+
+const TYPE_TEXT_COLORS = {
+  '荤': '#7A1230',
+  '素': '#0E5C44',
+  '主食': '#5C4300',
+  '甜点': '#063D66'
+}
+
+let appMode = 'home' // home / single / online
+let myPlayerId = 'p1'
+let roomId = ''
+let roomData = null
+let unsubscribeRoom = null
+let buttons = []
+let message = ''
+let rulesExpanded = false
+
+// =========================
+// 中英文切换
+// =========================
+let lang = localStorage.getItem('lilucard_lang') || 'zh'
+
+const I18N = {
+  zh: {
+    langBtn: 'EN',
+    title: '利禄卡',
+    subtitle: '卡路里外卖对战',
+    slogan: '我的嘴，就是秤。',
+    modes: '单机 / 开房间 / 加入房间',
+    rules: '游戏规则',
+    howToPlay: '游戏规则',
+    close: '收起',
+    solo: '单机游戏',
+    create: '开房间',
+    join: '加入房间',
+    music: '音乐',
+    musicOn: '音乐开',
+    musicOff: '音乐关',
+    musicErr: '音乐失败',
+    home: '首页',
+    opponent: '对手',
+    you: '你',
+    room: '房间',
+    waitingJoin: '等待另一名玩家加入',
+    readyStatus: '准备状态',
+    player1: '玩家1',
+    player2: '玩家2',
+    ready: '已准备',
+    notReady: '未准备',
+    readyBtn: '准备',
+    meat: '荤',
+    veg: '素',
+    staple: '主食',
+    dessert: '甜点',
+    eat: '开吃',
+    wait: '等待',
+    opening: '起手中',
+    ordering: '点餐中',
+    watching: '观察中',
+    busted: '爆牌',
+    stood: '已开吃',
+    orders: '外卖',
+    totalKcal: '全日总热量',
+    settledKcal: '已结算热量',
+    kcal: 'kcal',
+    unknownKcal: '? + ',
+    warning: '警戒线',
+    rivalOrdering: '对方点餐中',
+    waitRival: '等待对方操作',
+    reveal: '展示夜宵',
+    night: '夜宵',
+    result: '结算',
+    finalResult: '今日结算',
+    nextRound: '准备下一局',
+    restartHome: '返回首页',
+    confirmedWait: '已确认，等待对方',
+    noRecord: '无记录',
+    noOrders: '无外卖',
+    youWonMeal: '本餐你赢了',
+    youLostMeal: '本餐你输了',
+    mealDraw: '本餐平局',
+    quoteWin: '你很会吃啊，小朋友。',
+    quoteLose: '你会吃有个屁用。',
+    quoteDraw: '你俩都挺能装。',
+    yourOrders: '你的外卖',
+    rivalOrders: '对方外卖',
+    confirmGo: '确认进入',
+    finalWin: '恭喜你赢了！',
+    finalLose: '你输了',
+    finalDraw: '平局',
+    finalWinSub: '你赢得了这一整局',
+    finalLoseSub: '对方赢得了这一整局',
+    finalDrawSub: '双方今天吃得不相上下',
+    yourTurn: '你的回合',
+    chooseOrEat: '选外卖或开吃',
+    draw2: '双方可同时抽',
+    pickAll: '选完后展示',
+    rulesLines: [
+      '🎯 胜负目标',
+      '每餐胜利 = 1分。一天共 4 餐，最终分数高者获胜。',
+
+      '🔁 游戏流程',
+      '游戏分为：早餐 → 午餐 → 晚餐 → 夜宵。',
+      '每餐你可以重复选择：点外卖，或开吃。',
+      '当双方都开吃后，自动结算本餐胜负。',
+
+      '⚠️ 爆牌规则',
+      '每餐都有一个警戒线。',
+      '总热量超过警戒线 = 爆牌。',
+      '爆牌者本餐直接输。',
+      '爆牌这一餐的热量不会计入今日总热量。',
+
+      '👀 信息规则',
+      '对方第一张是暗牌。',
+      '后续抽的都是明牌。',
+      '对方热量显示为：？ + 明牌热量。',
+
+      '🧠 卡牌特性',
+      '每张牌都有不同热量。',
+      '有低热量补分牌，也有高热量风险牌。',
+      '刺客牌看起来安全，但容易让你意外爆牌。',
+
+      '🧩 牌型系统',
+      '牌型仅在不爆牌时生效。',
+      '中级牌型奖励：+1张荤牌计入今日总热量。',
+      '双拼套餐：任意两类 ≥2张。',
+      '偏科套餐：任意一类 ≥3张。',
+      '高级牌型奖励：本餐直接+1分。',
+      '满汉大餐：四类齐全且 ≥5张。',
+      '卡线大师：总热量刚好等于警戒线。',
+      '每餐只触发最高级一个牌型。',
+
+      '🌙 夜宵规则',
+      '夜宵会使用剩余所有外卖次数。',
+      '一次性点完，然后统一结算。',
+
+      '✅ 一句话总结',
+      '在不爆的前提下，比对方更接近极限。'
+    ]
+  },
+  en: {
+    langBtn: '中',
+    title: 'LiluCard',
+    subtitle: 'Calorie Takeout Duel',
+    slogan: 'My mouth is the scale.',
+    modes: 'Solo / Create Room / Join Room',
+    rules: 'Rules',
+    howToPlay: 'How to Play',
+    close: 'Close',
+    solo: 'Solo',
+    create: 'Create Room',
+    join: 'Join Room',
+    music: 'Music',
+    musicOn: 'Music On',
+    musicOff: 'Music Off',
+    musicErr: 'Music Err',
+    home: 'Home',
+    opponent: 'Rival',
+    you: 'You',
+    room: 'Room',
+    waitingJoin: 'Waiting for another player',
+    readyStatus: 'Ready',
+    player1: 'P1',
+    player2: 'P2',
+    ready: 'Ready',
+    notReady: 'Not Ready',
+    readyBtn: 'Ready',
+    meat: 'Meat',
+    veg: 'Veg',
+    staple: 'Staple',
+    dessert: 'Dessert',
+    eat: 'Eat',
+    wait: 'Wait',
+    opening: 'Opening',
+    ordering: 'Ordering',
+    watching: 'Watching',
+    busted: 'Busted',
+    stood: 'Eating',
+    orders: 'Orders',
+    totalKcal: 'Day Total',
+    settledKcal: 'Settled',
+    kcal: 'kcal',
+    unknownKcal: '? + ',
+    warning: 'Limit',
+    rivalOrdering: 'Rival ordering',
+    waitRival: 'Wait for rival',
+    reveal: 'Reveal',
+    night: 'Night',
+    result: 'Result',
+    finalResult: 'Final Result',
+    nextRound: 'Next Round',
+    restartHome: 'Home',
+    confirmedWait: 'Confirmed, waiting',
+    noRecord: 'No record',
+    noOrders: 'No orders',
+    youWonMeal: 'You won this meal',
+    youLostMeal: 'You lost this meal',
+    mealDraw: 'Meal draw',
+    quoteWin: 'You really know how to eat.',
+    quoteLose: 'Eating well did nothing.',
+    quoteDraw: 'Both of you can pretend.',
+    yourOrders: 'Your Orders',
+    rivalOrders: 'Rival Orders',
+    confirmGo: 'Go to ',
+    finalWin: 'You Win!',
+    finalLose: 'You Lose',
+    finalDraw: 'Draw',
+    finalWinSub: 'You won the full day',
+    finalLoseSub: 'Rival won the full day',
+    finalDrawSub: 'Both ate equally hard',
+    yourTurn: 'Your turn',
+    chooseOrEat: 'Order or Eat',
+    draw2: 'Draw 2 cards',
+    pickAll: 'Pick all',
+    rulesLines: [
+      '🎯 Goal',
+      'Winning a meal gives 1 point. There are 4 meals in a day. Higher final score wins.',
+
+      '🔁 Game Flow',
+      'The day has 4 meals: Breakfast → Lunch → Dinner → Night Snack.',
+      'During each meal, you may keep ordering cards or choose Eat to stop.',
+      'When both players choose Eat, the meal is settled automatically.',
+
+      '⚠️ Bust Rule',
+      'Each meal has a calorie limit.',
+      'Going over the limit means Bust.',
+      'If you bust, you lose that meal immediately.',
+      'Calories from a busted meal do not count toward your daily total.',
+
+      '👀 Information',
+      'The rival’s first card is hidden.',
+      'All later cards are visible.',
+      'The rival’s calories show as: ? + visible calories.',
+
+      '🧠 Card Traits',
+      'Each card has a different calorie value.',
+      'Some cards are low-calorie fillers, while others are high-risk cards.',
+      'Assassin cards may look safe, but can unexpectedly make you bust.',
+
+      '🧩 Combo System',
+      'Combos only activate if you do not bust.',
+      'Mid combo reward: +1 Meat card added to your daily total.',
+      'Double Combo: any two categories have at least 2 cards each.',
+      'One-Type Combo: any one category has at least 3 cards.',
+      'High combo reward: +1 point for this meal.',
+      'Full Feast: all 4 categories appear and you have at least 5 cards.',
+      'Limit Master: your calories exactly equal the limit.',
+      'Only the highest combo can trigger each meal.',
+
+      '🌙 Night Snack',
+      'Night Snack uses all remaining order chances.',
+      'Choose them all at once, then reveal and settle.',
+
+      '✅ Summary',
+      'Do not bust. Get closer to the limit than your rival.'
+    ]
+  }
+}
+
+function t(key) {
+  const pack = I18N[lang] || I18N.zh
+  return pack[key] !== undefined ? pack[key] : (I18N.zh[key] || key)
+}
+
+function mealName(index) {
+  const names = lang === 'en'
+    ? ['Breakfast', 'Lunch', 'Dinner', 'Night Snack']
+    : ['早餐', '午餐', '晚餐', '夜宵']
+
+  return names[index] || ''
+}
+
+
+// =========================
+// 背景音乐 BGM
+// =========================
+// 请在 GitHub 根目录上传：audio/bgm.mp3
+// 手机浏览器必须在玩家第一次点击后才能播放音乐。
+const BGM_SRC = './audio/bgm.mp3'
+
+let bgm = null
+let bgmEnabled = true
+let bgmStarted = false
+let bgmLoadFailed = false
+let bgmStatusText = ''
+let bgmUserInteracted = false
+let localReadyLocked = false
+let startRequested = false
+let startOverlayText = ''
+let startOverlayUntil = 0
+let localGameActionSeq = 0
+let pendingWriteUntil = 0
+let pendingActionId = ''
+let rulesScroll = 0
+let rulesMaxScroll = 0
+let rulesTouchDragging = false
+let rulesTouchLastY = 0
+const buttonPulse = {}
+const BUTTON_PULSE_MS = 160
+let onlineActionLocked = false
+let onlineActionLockUntil = 0
+
+let game = createGame('single')
+
+
+
+
+function initBgm() {
+  if (bgm) return
+
+  try {
+    bgm = new Audio()
+    bgm.loop = true
+    bgm.volume = 0.32
+    bgm.preload = 'auto'
+    bgm.autoplay = false
+    bgm.muted = false
+    bgm.playsInline = true
+    bgm.setAttribute('playsinline', 'true')
+    bgm.setAttribute('webkit-playsinline', 'true')
+
+    bgm.addEventListener('canplaythrough', () => {
+      bgmLoadFailed = false
+      if (bgmUserInteracted && !bgmStatusText) bgmStatusText = '音乐已加载'
+      requestRender()
+    })
+
+    bgm.addEventListener('error', () => {
+      bgmLoadFailed = true
+      if (bgmUserInteracted) bgmStatusText = '音乐文件未找到'
+      requestRender()
+    })
+
+    bgm.src = BGM_SRC
+    bgm.load()
+  } catch (err) {
+    bgmLoadFailed = true
+    if (bgmUserInteracted) bgmStatusText = '音乐初始化失败'
+  }
+}
+
+
+
+
+function startBgm() {
+  bgmUserInteracted = true
+  if (!bgmEnabled) return
+
+  initBgm()
+
+  if (!bgm || bgmLoadFailed) {
+    bgmStatusText = '音乐文件未找到'
+    requestRender()
+    return
+  }
+
+  try {
+    bgm.muted = false
+    bgm.volume = 0.32
+    if (bgm.readyState === 0) bgm.load()
+  } catch (err) {}
+
+  const playPromise = bgm.play()
+
+  if (playPromise && playPromise.then) {
+    playPromise
+      .then(() => {
+        bgmStarted = true
+        bgmStatusText = ''
+        requestRender()
+      })
+      .catch(() => {
+        bgmStarted = false
+        bgmStatusText = '点音乐启动'
+        requestRender()
+      })
+  } else {
+    bgmStarted = true
+    bgmStatusText = ''
+    requestRender()
+  }
+}
+
+
+function toggleBgm() {
+  bgmUserInteracted = true
+  initBgm()
+
+  if (bgmLoadFailed) {
+    bgmStatusText = '音乐文件未找到'
+    requestRender()
+    return
+  }
+
+  if (!bgmEnabled) {
+    bgmEnabled = true
+    startBgm()
+    return
+  }
+
+  if (!bgmStarted || (bgm && bgm.paused)) {
+    bgmEnabled = true
+    startBgm()
+    return
+  }
+
+  bgmEnabled = false
+  if (bgm) bgm.pause()
+  bgmStatusText = ''
+  requestRender()
+}
+
+
+
+
+function drawMusicButton() {
+  let label = t('music')
+
+  if (bgmLoadFailed) {
+    label = t('musicErr')
+  } else if (!bgmEnabled) {
+    label = t('musicOff')
+  } else if (bgmStarted && bgm && !bgm.paused) {
+    label = t('musicOn')
+  }
+
+  const y = Math.max(3, SAFE_TOP - 11)
+  const musicW = lang === 'en' ? 64 : 50
+
+  addButton('music_toggle', label, 8, y, musicW, 22, '#FFFFFF', '#111', 9)
+  addButton('lang_toggle', t('langBtn'), 12 + musicW, y, 32, 22, '#FFFFFF', '#111', 10)
+
+  if (bgmStatusText && (!bgmStarted || bgmLoadFailed)) {
+    drawText(bgmStatusText, 50 + musicW, y + 6, 8, bgmLoadFailed ? '#E94335' : '#777', 'left', 'bold')
+  }
+}
+
+
+
+// =========================
+// 基础工具
+// =========================
+
+function safeArray(value) {
+  if (Array.isArray(value)) return value.filter(v => v !== null && v !== undefined)
+  if (!value) return []
+  if (typeof value === 'object') {
+    return Object.keys(value)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => value[k])
+      .filter(v => v !== null && v !== undefined)
+  }
+  return []
+}
+
+function safeNumberArray(value, length) {
+  const arr = safeArray(value)
+  const out = []
+  for (let i = 0; i < length; i++) out[i] = Number(arr[i] || 0)
+  return out
+}
+
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj))
+}
+
+function randomId() {
+  return `${Date.now()}_${Math.floor(Math.random() * 999999)}`
+}
+
+function shuffle(arr) {
+  const a = arr.slice()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const t = a[i]
+    a[i] = a[j]
+    a[j] = t
+  }
+  return a
+}
+
+function cloneCard(card) {
+  return {
+    id: randomId(),
+    name: card.name,
+    english: card.english,
+    type: card.type,
+    kcal: card.kcal,
+    hidden: false,
+    privateCard: false
+  }
+}
+
+function makeDeck() {
+  return shuffle(FOOD_CARDS.map(cloneCard))
+}
+
+function normalizeType(cardOrType) {
+  const t = typeof cardOrType === 'string'
+    ? cardOrType
+    : (cardOrType.type || cardOrType.category || cardOrType.suit || cardOrType.kind || '')
+
+  if (t === '荤' || t === '肉' || t === '肉菜' || t === 'meat') return '荤'
+  if (t === '素' || t === '素菜' || t === 'veg') return '素'
+  if (t === '主' || t === '主食' || t === 'rice' || t === 'staple') return '主食'
+  if (t === '甜' || t === '甜点' || t === 'dessert') return '甜点'
+  return t
+}
+
+function drawFromDeck(g, type) {
+  if (!g.deck || g.deck.length === 0) g.deck = makeDeck()
+
+  let indexes = []
+  if (type) {
+    for (let i = 0; i < g.deck.length; i++) {
+      if (normalizeType(g.deck[i]) === type) indexes.push(i)
+    }
+
+    if (indexes.length === 0) {
+      g.deck = g.deck.concat(makeDeck())
+      for (let i = 0; i < g.deck.length; i++) {
+        if (normalizeType(g.deck[i]) === type) indexes.push(i)
+      }
+    }
+  } else {
+    indexes = g.deck.map((_, i) => i)
+  }
+
+  if (indexes.length === 0) return null
+  const deckIndex = indexes[Math.floor(Math.random() * indexes.length)]
+  return g.deck.splice(deckIndex, 1)[0]
+}
+
+function calcCardsKcal(cards) {
+  return safeArray(cards).reduce((sum, card) => sum + Number(card.kcal || 0), 0)
+}
+
+function getVisibleKcal(cards) {
+  return safeArray(cards).reduce((sum, card) => {
+    if (card.hidden) return sum
+    return sum + Number(card.kcal || 0)
+  }, 0)
+}
+
+function getPlayerName(pid) {
+  return pid === 'p1' ? '玩家1' : '玩家2'
+}
+
+function otherPlayer(pid) {
+  return pid === 'p1' ? 'p2' : 'p1'
+}
+
+function getSelfId() {
+  return appMode === 'online' ? myPlayerId : 'p1'
+}
+
+function getOpponentId() {
+  return otherPlayer(getSelfId())
+}
+
+function getMeal() {
+  return meals[game.mealIndex]
+}
+
+function getRoomPlayers() {
+  return roomData && roomData.players ? roomData.players : {}
+}
+
+function isReadyLockedForMe() {
+  const players = getRoomPlayers()
+  return Boolean(localReadyLocked || (players[myPlayerId] && players[myPlayerId].ready))
+}
+
+function areBothPlayersReady() {
+  const players = getRoomPlayers()
+  return Boolean(players.p1 && players.p2 && players.p1.ready && players.p2.ready)
+}
+
+function showStartOverlay(text, ms) {
+  startOverlayText = text || '开局中...'
+  startOverlayUntil = Date.now() + (ms || 1200)
+}
+
+function isBusted(g, pid) {
+  const meal = meals[g.mealIndex]
+  return calcCardsKcal(g.players[pid].cards) > meal.threshold
+}
+
+
+function isEnded(g, pid) {
+  const p = g.players[pid]
+  // v2.4：爆牌不再自动结束。
+  // 玩家可以继续叫外卖来迷惑对方，只有主动开吃才算结束。
+  return Boolean(p.stood)
+}
+
+function getRemainingOrders(g, pid) {
+  return Math.max(0, TOTAL_ORDERS_PER_DAY - Number(g.records[pid].dayOrdersUsed || 0))
+}
+
+function getMealStarter(g, index) {
+  if (!g.firstTurnPlayer) g.firstTurnPlayer = Math.random() < 0.5 ? 'p1' : 'p2'
+
+  if (index === 0) return g.firstTurnPlayer
+  if (index === 1) return otherPlayer(g.firstTurnPlayer)
+  if (index === 2) return g.firstTurnPlayer
+  return null
+}
+
+// =========================
+// 游戏数据结构
+// =========================
+
+function createPlayerState() {
+  return {
+    cards: [],
+    nightChoices: [],
+    stood: false,
+    busted: false,
+    ordersUsed: 0
+  }
+}
+
+function createRecord() {
+  return {
+    mealKcal: meals.map(() => 0),
+    rawMealKcal: meals.map(() => 0),
+    basePoint: meals.map(() => 0),
+    comboBonusPoint: meals.map(() => 0),
+    comboResults: meals.map(() => null),
+    dayBonusKcal: 0,
+    dayBonusCards: [],
+    dayOrdersUsed: 0
+  }
+}
+
+function normalizePlayerState(p) {
+  const base = createPlayerState()
+  const src = p && typeof p === 'object' ? p : {}
+  return {
+    ...base,
+    ...src,
+    cards: safeArray(src.cards),
+    nightChoices: safeArray(src.nightChoices),
+    stood: Boolean(src.stood),
+    busted: Boolean(src.busted),
+    ordersUsed: Number(src.ordersUsed || 0)
+  }
+}
+
+function normalizeRecord(r) {
+  const base = createRecord()
+  const src = r && typeof r === 'object' ? r : {}
+
+  return {
+    ...base,
+    ...src,
+    mealKcal: safeNumberArray(src.mealKcal, meals.length),
+    rawMealKcal: safeNumberArray(src.rawMealKcal, meals.length),
+    basePoint: safeNumberArray(src.basePoint, meals.length),
+    comboBonusPoint: safeNumberArray(src.comboBonusPoint, meals.length),
+    comboResults: safeArray(src.comboResults),
+    dayBonusKcal: Number(src.dayBonusKcal || 0),
+    dayBonusCards: safeArray(src.dayBonusCards),
+    dayOrdersUsed: Number(src.dayOrdersUsed || 0)
+  }
+}
+
+function normalizeGame(g) {
+  const base = createGame('online')
+  const src = g && typeof g === 'object' ? g : {}
+
+  return {
+    ...base,
+    ...src,
+    deck: safeArray(src.deck),
+    players: {
+      p1: normalizePlayerState(src.players && src.players.p1),
+      p2: normalizePlayerState(src.players && src.players.p2)
+    },
+    records: {
+      p1: normalizeRecord(src.records && src.records.p1),
+      p2: normalizeRecord(src.records && src.records.p2)
+    },
+    mealIndex: Number(src.mealIndex || 0),
+    actionSeq: Number(src.actionSeq || 0),
+    lastMealResult: src.lastMealResult || null,
+    mealResults: safeArray(src.mealResults).length ? safeArray(src.mealResults) : meals.map(() => null),
+    firstTurnPlayer: src.firstTurnPlayer || null,
+    turn: src.turn || null,
+    phase: src.phase || 'lobby',
+    message: src.message || '',
+    comboMessage: src.comboMessage || '',
+    nextReady: {
+      p1: Boolean(src.nextReady && src.nextReady.p1),
+      p2: Boolean(src.nextReady && src.nextReady.p2)
+    },
+    replayReady: {
+      p1: Boolean(src.replayReady && src.replayReady.p1),
+      p2: Boolean(src.replayReady && src.replayReady.p2)
+    }
+  }
+}
+
+function createGame(mode) {
+  return {
+    mode,
+    phase: mode === 'single' ? 'opening' : 'lobby',
+    mealIndex: 0,
+    turn: null,
+    firstTurnPlayer: null,
+    deck: makeDeck(),
+    players: {
+      p1: createPlayerState(),
+      p2: createPlayerState()
+    },
+    records: {
+      p1: createRecord(),
+      p2: createRecord()
+    },
+    lastMealResult: null,
+    mealResults: meals.map(() => null),
+    message: mode === 'single'
+      ? '早餐开始：起手阶段，先抽2张起手牌'
+      : '等待玩家加入并准备',
+    comboMessage: '',
+    actionSeq: 0,
+    nextReady: { p1: false, p2: false },
+    replayReady: { p1: false, p2: false }
+  }
+}
+
+function resetMealState(g) {
+  g.players.p1 = createPlayerState()
+  g.players.p2 = createPlayerState()
+  g.lastMealResult = null
+  g.comboMessage = ''
+  g.nextReady = { p1: false, p2: false }
+}
+
+function enterOpening(g) {
+  g.phase = 'opening'
+  g.turn = null
+  resetMealState(g)
+  g.message = `${meals[g.mealIndex].name}开始：起手阶段不分先后，双方各抽2张`
+}
+
+function enterMealPlayingIfReady(g) {
+  const p1Count = safeArray(g.players.p1.cards).length
+  const p2Count = safeArray(g.players.p2.cards).length
+
+  if (p1Count < 2 || p2Count < 2) return false
+
+  g.players.p1.busted = isBusted(g, 'p1')
+  g.players.p2.busted = isBusted(g, 'p2')
+
+  if (isEnded(g, 'p1') && isEnded(g, 'p2')) {
+    settleMeal(g)
+    return true
+  }
+
+  const starter = getMealStarter(g, g.mealIndex)
+  g.turn = isEnded(g, starter) ? otherPlayer(starter) : starter
+  g.phase = 'meal_playing'
+  g.message = `${meals[g.mealIndex].name}点餐开始：${getPlayerName(g.turn)}点餐回合`
+  return true
+}
+
+
+function settleNightNoOrders(g) {
+  const meal = meals[g.mealIndex]
+  const p1Remain = getRemainingOrders(g, 'p1')
+  const p2Remain = getRemainingOrders(g, 'p2')
+
+  g.players.p1.cards = []
+  g.players.p2.cards = []
+  g.players.p1.nightChoices = []
+  g.players.p2.nightChoices = []
+  g.players.p1.stood = true
+  g.players.p2.stood = true
+  g.players.p1.busted = false
+  g.players.p2.busted = false
+
+  g.records.p1.rawMealKcal[g.mealIndex] = 0
+  g.records.p2.rawMealKcal[g.mealIndex] = 0
+  g.records.p1.mealKcal[g.mealIndex] = 0
+  g.records.p2.mealKcal[g.mealIndex] = 0
+  g.records.p1.comboResults[g.mealIndex] = null
+  g.records.p2.comboResults[g.mealIndex] = null
+
+  let winner = null
+  let resultText = '双方都没有外卖机会，夜宵无人得分'
+
+  if (p1Remain <= 0 && p2Remain > 0) {
+    winner = 'p2'
+    g.records.p2.basePoint[g.mealIndex] += 1
+    resultText = '玩家1没有留下外卖机会，玩家2赢得夜宵'
+  } else if (p2Remain <= 0 && p1Remain > 0) {
+    winner = 'p1'
+    g.records.p1.basePoint[g.mealIndex] += 1
+    resultText = '玩家2没有留下外卖机会，玩家1赢得夜宵'
+  }
+
+  const p1Point = getMealPoint(g, 'p1', g.mealIndex)
+  const p2Point = getMealPoint(g, 'p2', g.mealIndex)
+
+  g.lastMealResult = {
+    mealIndex: g.mealIndex,
+    mealName: meal.name,
+    threshold: meal.threshold,
+    p1Cards: [],
+    p2Cards: [],
+    p1Total: 0,
+    p2Total: 0,
+    p1Busted: false,
+    p2Busted: false,
+    p1Combo: null,
+    p2Combo: null,
+    p1Point,
+    p2Point,
+    winner,
+    resultText,
+    scoreText: `玩家1 ${getMealTotalPoint(g, 'p1')} : ${getMealTotalPoint(g, 'p2')} 玩家2`
+  }
+
+  if (!g.mealResults) g.mealResults = meals.map(() => null)
+  g.mealResults[g.mealIndex] = clone(g.lastMealResult)
+
+  g.phase = 'meal_result'
+  g.turn = null
+  g.nextReady = { p1: false, p2: false }
+  g.message = `夜宵结算：${resultText}`
+  g.comboMessage = ''
+  g.actionSeq += 1
+}
+
+
+function enterNightPicking(g) {
+  g.phase = 'night_picking'
+  g.turn = null
+  resetMealState(g)
+
+  const p1Remain = getRemainingOrders(g, 'p1')
+  const p2Remain = getRemainingOrders(g, 'p2')
+
+  if (p1Remain <= 0 || p2Remain <= 0) {
+    settleNightNoOrders(g)
+    return
+  }
+
+  g.message = '夜宵开始：不分先后，双方按剩余外卖次数选择搭配'
+}
+
+function enterNextMeal(g) {
+  const next = g.mealIndex + 1
+
+  if (next >= meals.length) {
+    g.phase = 'day_result'
+    g.turn = null
+    g.message = '今日结算完成'
+    return
+  }
+
+  g.mealIndex = next
+  g.nextReady = { p1: false, p2: false }
+
+  if (g.mealIndex === 3) {
+    enterNightPicking(g)
+  } else {
+    enterOpening(g)
+  }
+}
+
+// =========================
+// 组合与结算
+// =========================
+
+function getTypeCounts(cards) {
+  const counts = { '荤': 0, '素': 0, '主食': 0, '甜点': 0 }
+
+  safeArray(cards).forEach(card => {
+    const type = normalizeType(card)
+    if (counts[type] !== undefined) counts[type] += 1
+  })
+
+  return counts
+}
+
+function evaluateMealCombo(cards, threshold) {
+  const total = calcCardsKcal(cards)
+  if (total > threshold) return null
+
+  const counts = getTypeCounts(cards)
+  const types = ['荤', '素', '主食', '甜点']
+  const hasAllTypes = types.every(type => counts[type] >= 1)
+  const pairTypes = types.filter(type => counts[type] >= 2)
+  const maxType = types.reduce((a, b) => counts[a] >= counts[b] ? a : b)
+  const maxCount = counts[maxType]
+
+  if (total === threshold) {
+    return {
+      level: 'high',
+      name: '卡线大师',
+      desc: '本餐热量刚好等于警戒线',
+      reward: '本餐胜局 +1'
+    }
+  }
+
+  if (hasAllTypes) {
+    return {
+      level: 'high',
+      name: '满汉大餐',
+      desc: '荤 / 素 / 主食 / 甜点四类齐全',
+      reward: '本餐胜局 +1'
+    }
+  }
+
+  const hasDoubleCombo = pairTypes.length >= 2
+  const hasBiasCombo = maxCount >= 3
+
+  if (hasDoubleCombo && hasBiasCombo) {
+    if (maxCount >= 4) {
+      return {
+        level: 'middle',
+        name: '偏科套餐',
+        desc: `${maxType}类 ≥3 张`,
+        reward: '抽1张荤牌加入全日总分'
+      }
+    }
+
+    return {
+      level: 'middle',
+      name: '双拼套餐',
+      desc: '任意两个类别各 ≥2 张',
+      reward: '抽1张荤牌加入全日总分'
+    }
+  }
+
+  if (hasDoubleCombo) {
+    return {
+      level: 'middle',
+      name: '双拼套餐',
+      desc: '任意两个类别各 ≥2 张',
+      reward: '抽1张荤牌加入全日总分'
+    }
+  }
+
+  if (hasBiasCombo) {
+    return {
+      level: 'middle',
+      name: '偏科套餐',
+      desc: `${maxType}类 ≥3 张`,
+      reward: '抽1张荤牌加入全日总分'
+    }
+  }
+
+  return null
+}
+
+function drawRewardMeatCard(g, pid) {
+  let indexes = []
+  for (let i = 0; i < g.deck.length; i++) {
+    if (normalizeType(g.deck[i]) === '荤') indexes.push(i)
+  }
+
+  if (indexes.length === 0) {
+    g.deck = g.deck.concat(makeDeck())
+    for (let i = 0; i < g.deck.length; i++) {
+      if (normalizeType(g.deck[i]) === '荤') indexes.push(i)
+    }
+  }
+
+  if (indexes.length === 0) return null
+
+  const deckIndex = indexes[Math.floor(Math.random() * indexes.length)]
+  const reward = g.deck.splice(deckIndex, 1)[0]
+  reward.hidden = false
+  reward.privateCard = false
+
+  g.records[pid].dayBonusCards.push(reward)
+  g.records[pid].dayBonusKcal += Number(reward.kcal || 0)
+
+  return reward
+}
+
+function settlePlayerCombo(g, pid) {
+  const meal = meals[g.mealIndex]
+  const player = g.players[pid]
+  const total = calcCardsKcal(player.cards)
+  const busted = total > meal.threshold
+
+  g.records[pid].rawMealKcal[g.mealIndex] = total
+  g.records[pid].mealKcal[g.mealIndex] = busted ? 0 : total
+
+  player.busted = busted
+  player.stood = true
+
+  if (busted) {
+    g.records[pid].comboResults[g.mealIndex] = null
+    return null
+  }
+
+  const combo = evaluateMealCombo(player.cards, meal.threshold)
+
+  if (!combo) {
+    g.records[pid].comboResults[g.mealIndex] = null
+    return null
+  }
+
+  if (combo.level === 'high') {
+    g.records[pid].comboBonusPoint[g.mealIndex] += 1
+    combo.resultText = `${combo.name}：本餐胜局 +1`
+  }
+
+  if (combo.level === 'middle') {
+    const rewardCard = drawRewardMeatCard(g, pid)
+    combo.rewardCard = rewardCard || null
+
+    if (rewardCard) {
+      combo.resultText = `${combo.name}：奖励 ${rewardCard.name} +${rewardCard.kcal} kcal`
+    } else {
+      combo.resultText = `${combo.name}：没有可奖励的荤牌`
+    }
+  }
+
+  g.records[pid].comboResults[g.mealIndex] = combo
+  return combo
+}
+
+function getMealPoint(g, pid, mealIndex) {
+  return Number(g.records[pid].basePoint[mealIndex] || 0) + Number(g.records[pid].comboBonusPoint[mealIndex] || 0)
+}
+
+function getMealTotalPoint(g, pid) {
+  let point = 0
+  for (let i = 0; i < meals.length; i++) point += getMealPoint(g, pid, i)
+  return point
+}
+
+function getDayBaseKcal(g, pid) {
+  return safeNumberArray(g.records[pid].mealKcal, meals.length).reduce((sum, kcal) => sum + kcal, 0)
+}
+
+function getDayTotalKcal(g, pid) {
+  return getDayBaseKcal(g, pid) + Number(g.records[pid].dayBonusKcal || 0)
+}
+
+function getDayTotalPoint(g, pid) {
+  const p1 = getDayTotalKcal(g, 'p1')
+  const p2 = getDayTotalKcal(g, 'p2')
+
+  if (p1 === p2) return 0
+  if (pid === 'p1') return p1 > p2 ? 1 : 0
+  return p2 > p1 ? 1 : 0
+}
+
+function getFinalPoint(g, pid) {
+  return getMealTotalPoint(g, pid) + getDayTotalPoint(g, pid)
+}
+
+function settleMeal(g) {
+  const meal = meals[g.mealIndex]
+
+  safeArray(g.players.p1.cards).forEach(card => { card.hidden = false })
+  safeArray(g.players.p2.cards).forEach(card => { card.hidden = false })
+
+  const p1Total = calcCardsKcal(g.players.p1.cards)
+  const p2Total = calcCardsKcal(g.players.p2.cards)
+  const p1Busted = p1Total > meal.threshold
+  const p2Busted = p2Total > meal.threshold
+
+  g.players.p1.busted = p1Busted
+  g.players.p2.busted = p2Busted
+  g.players.p1.stood = true
+  g.players.p2.stood = true
+
+  const p1Combo = settlePlayerCombo(g, 'p1')
+  const p2Combo = settlePlayerCombo(g, 'p2')
+
+  let resultText = ''
+  let winner = null
+
+  if (p1Busted && p2Busted) {
+    resultText = '双方都爆牌，本餐无人得分'
+  } else if (p1Busted) {
+    g.records.p2.basePoint[g.mealIndex] += 1
+    winner = 'p2'
+    resultText = '玩家1爆牌，玩家2赢得本餐'
+  } else if (p2Busted) {
+    g.records.p1.basePoint[g.mealIndex] += 1
+    winner = 'p1'
+    resultText = '玩家2爆牌，玩家1赢得本餐'
+  } else if (p1Total > p2Total) {
+    g.records.p1.basePoint[g.mealIndex] += 1
+    winner = 'p1'
+    resultText = '玩家1热量更高，赢得本餐'
+  } else if (p2Total > p1Total) {
+    g.records.p2.basePoint[g.mealIndex] += 1
+    winner = 'p2'
+    resultText = '玩家2热量更高，赢得本餐'
+  } else {
+    resultText = '双方热量相同，本餐平局'
+  }
+
+  const p1Point = getMealPoint(g, 'p1', g.mealIndex)
+  const p2Point = getMealPoint(g, 'p2', g.mealIndex)
+
+  g.lastMealResult = {
+    mealIndex: g.mealIndex,
+    mealName: meal.name,
+    threshold: meal.threshold,
+    p1Cards: clone(g.players.p1.cards),
+    p2Cards: clone(g.players.p2.cards),
+    p1Total,
+    p2Total,
+    p1Busted,
+    p2Busted,
+    p1Combo,
+    p2Combo,
+    p1Point,
+    p2Point,
+    winner,
+    resultText,
+    scoreText: `玩家1 ${getMealTotalPoint(g, 'p1')} : ${getMealTotalPoint(g, 'p2')} 玩家2`
+  }
+
+  if (!g.mealResults) g.mealResults = meals.map(() => null)
+  g.mealResults[g.mealIndex] = clone(g.lastMealResult)
+
+  g.phase = g.mealIndex >= meals.length - 1 ? 'meal_result' : 'meal_result'
+  g.turn = null
+  g.nextReady = { p1: false, p2: false }
+  g.message = `${meal.name}结算：${resultText}`
+  g.comboMessage = ''
+  g.actionSeq += 1
+}
+
+// =========================
+// 玩家操作
+// =========================
+
+
+
+function canPlayerAct(g, pid) {
+  if (g.phase === 'opening') {
+    return safeArray(g.players[pid].cards).length < 2
+  }
+
+  if (g.phase === 'meal_playing') {
+    if (g.players[pid].stood) return false
+    return g.turn === pid
+  }
+
+  if (g.phase === 'night_picking') {
+    return getRemainingOrders(g, pid) > 0
+  }
+
+  return false
+}
+
+
+
+
+function getActionHint(g, selfId) {
+  const oppId = otherPlayer(selfId)
+  const self = g.players[selfId]
+  const opp = g.players[oppId]
+
+  if (appMode === 'online' && (!roomData || roomData.status === 'lobby' || g.phase === 'lobby')) {
+    const players = roomData && roomData.players ? roomData.players : {}
+    const p1Ready = Boolean(players.p1 && players.p1.ready)
+    const p2Ready = Boolean(players.p2 && players.p2.ready)
+
+    if (!players.p1 || !players.p2) return `房间码 ${roomId}：等待另一名玩家加入`
+    return `准备状态：玩家1 ${p1Ready ? '已准备' : '未准备'}｜玩家2 ${p2Ready ? '已准备' : '未准备'}`
+  }
+
+  if (g.phase === 'opening') {
+    const count = safeArray(self.cards).length
+    const oppCount = safeArray(opp.cards).length
+
+    if (count < 2) return `起手阶段：你可以直接抽牌，目前 ${count}/2`
+    if (oppCount < 2) return '你已抽满起手牌，等待对方出牌'
+    return '双方起手完成，准备进入点餐回合'
+  }
+
+  if (g.phase === 'meal_playing') {
+    if (self.stood) return '你已开吃，等待对方继续点外卖或开吃'
+    if (opp.stood && g.turn === selfId) return '对方已开吃，你可以继续点外卖，或选择开吃结算'
+
+    if (g.turn === selfId) {
+      if (self.busted || isBusted(g, selfId)) {
+        return '已爆牌：可继续迷惑，或开吃摊牌'
+      }
+
+      return '你的回合：选外卖或开吃'
+    }
+
+    return '对方点餐中：等待对方操作'
+  }
+
+  if (g.phase === 'night_picking') {
+    const remain = getRemainingOrders(g, selfId)
+    const oppRemain = getRemainingOrders(g, oppId)
+
+    if (remain > 0) return `夜宵阶段：还要选择 ${remain} 单`
+    if (oppRemain > 0) return '你已选完夜宵，等待对方选完'
+    return '双方夜宵已选完，点击展示夜宵'
+  }
+
+  if (g.phase === 'night_ready') {
+    return '双方夜宵已选完，点击展示夜宵'
+  }
+
+  if (g.phase === 'meal_result') {
+    const next = g.mealIndex >= 3 ? '今日结算' : `进入${meals[g.mealIndex + 1].name}`
+    return `本餐结算完成，点击${next}`
+  }
+
+  if (g.phase === 'day_result') return '今日结算完成'
+
+  return g.message || ''
+}
+
+
+
+function applyDraw(g, pid, type) {
+  if (!canPlayerAct(g, pid)) return
+
+  if (g.phase === 'opening') {
+    const card = drawFromDeck(g, type)
+    if (!card) return
+
+    card.hidden = false
+    card.privateCard = safeArray(g.players[pid].cards).length === 0
+    g.players[pid].cards.push(card)
+
+    if (isBusted(g, pid)) {
+      // 只有自己界面会通过自己的总热量知道爆牌；
+      // 不在共享 message 里暴露给对方。
+      g.players[pid].busted = true
+    }
+
+    g.message = `${getPlayerName(pid)}抽了一张起手牌`
+
+    enterMealPlayingIfReady(g)
+    g.actionSeq += 1
+    return
+  }
+
+  if (g.phase === 'meal_playing') {
+    const card = drawFromDeck(g, type)
+    if (!card) return
+
+    card.hidden = false
+    card.privateCard = false
+    g.players[pid].cards.push(card)
+    g.players[pid].ordersUsed += 1
+    g.records[pid].dayOrdersUsed += 1
+
+    if (isBusted(g, pid)) {
+      // v2.4：爆牌只记录在状态里，不自动结束，也不广播给对方。
+      g.players[pid].busted = true
+    }
+
+    g.message = `${getPlayerName(pid)}点了一单${type}外卖`
+
+    // 只有双方都主动开吃，才进入本餐结算。
+    if (g.players.p1.stood && g.players.p2.stood) {
+      settleMeal(g)
+    } else {
+      const other = otherPlayer(pid)
+      g.turn = g.players[other].stood ? pid : other
+      g.message += `，${getPlayerName(g.turn)}点餐回合`
+    }
+
+    g.actionSeq += 1
+    return
+  }
+
+  if (g.phase === 'night_picking') {
+    if (getRemainingOrders(g, pid) <= 0) return
+
+    g.players[pid].nightChoices.push(type)
+    g.records[pid].dayOrdersUsed += 1
+
+    const remain = getRemainingOrders(g, pid)
+    g.message = `${getPlayerName(pid)}选择了一单夜宵；剩余 ${remain} 单`
+
+    if (getRemainingOrders(g, 'p1') <= 0 && getRemainingOrders(g, 'p2') <= 0) {
+      g.phase = 'night_ready'
+      g.turn = null
+      g.message = '双方夜宵已选完，点击展示夜宵'
+    }
+
+    g.actionSeq += 1
+  }
+}
+
+
+function applyStand(g, pid) {
+  if (g.phase === 'opening') {
+    g.message = '起手阶段请先抽满2张起手牌'
+    return
+  }
+
+  if (g.phase === 'meal_playing') {
+    if (g.players[pid].stood) return
+
+    if (safeArray(g.players[pid].cards).length < 2) {
+      g.message = `${getPlayerName(pid)}还没抽满起手牌`
+      return
+    }
+
+    if (isBusted(g, pid)) {
+      g.players[pid].busted = true
+    }
+
+    g.players[pid].stood = true
+    g.message = `${getPlayerName(pid)}选择收手`
+
+    if (g.players.p1.stood && g.players.p2.stood) {
+      settleMeal(g)
+    } else {
+      const other = otherPlayer(pid)
+      if (!g.players[other].stood) g.turn = other
+    }
+
+    g.actionSeq += 1
+    return
+  }
+
+  if (g.phase === 'night_picking') {
+    g.message = getRemainingOrders(g, pid) > 0
+      ? `请先选完夜宵搭配，还剩 ${getRemainingOrders(g, pid)} 单`
+      : '你已选完夜宵，等待对方'
+    g.actionSeq += 1
+  }
+}
+
+function revealNightAndSettle(g) {
+  ;['p1', 'p2'].forEach(pid => {
+    const player = g.players[pid]
+    safeArray(player.nightChoices).forEach(type => {
+      const card = drawFromDeck(g, type)
+      if (card) {
+        card.hidden = false
+        card.privateCard = false
+        player.cards.push(card)
+      }
+    })
+    player.nightChoices = []
+    player.stood = true
+  })
+
+  settleMeal(g)
+}
+
+
+function applyNext(g, pid) {
+  if (g.phase === 'meal_result') {
+    if (appMode === 'online') {
+      if (!g.nextReady) g.nextReady = { p1: false, p2: false }
+
+      g.nextReady[pid] = true
+
+      if (g.nextReady.p1 && g.nextReady.p2) {
+        enterNextMeal(g)
+      } else {
+        const nextName = g.mealIndex >= meals.length - 1 ? '今日结算' : meals[g.mealIndex + 1].name
+        g.message = `${getPlayerName(pid)}已确认，等待对方进入${nextName}`
+      }
+
+      g.actionSeq += 1
+      return
+    }
+
+    enterNextMeal(g)
+    g.actionSeq += 1
+    return
+  }
+
+  if (g.phase === 'day_result') {
+    // 今日结算页不自动重开，由 replayReady 控制
+  }
+}
+
+function createReplayGameFrom(g) {
+  const fresh = createGame(appMode === 'online' ? 'online' : 'single')
+  fresh.phase = 'opening'
+  fresh.message = '新一局开始：早餐起手阶段，双方可以同时抽2张'
+  fresh.actionSeq = Number(g.actionSeq || 0) + 1
+  fresh.nextReady = { p1: false, p2: false }
+  fresh.replayReady = { p1: false, p2: false }
+  return fresh
+}
+
+function applyReplayReady(pid) {
+  if (appMode !== 'online') {
+    leaveToHome()
+    return
+  }
+
+  if (!game.replayReady) game.replayReady = { p1: false, p2: false }
+
+  game.replayReady[pid] = true
+
+  if (game.replayReady.p1 && game.replayReady.p2) {
+    game = createReplayGameFrom(game)
+    // v2.4：下一整局直接进入起手阶段，不再弹出“双方已准备”覆盖层。
+  } else {
+    game.message = `${getPlayerName(pid)}已准备下一局，等待对方准备`
+    game.actionSeq += 1
+  }
+}
+
+
+// =========================
+// 单机 AI
+// =========================
+
+function aiOpeningIfNeeded(g) {
+  while (g.phase === 'opening' && safeArray(g.players.p2.cards).length < 2) {
+    const types = ['荤', '素', '主食', '甜点']
+    applyDraw(g, 'p2', types[Math.floor(Math.random() * types.length)])
+  }
+}
+
+function aiTakeTurn(g) {
+  if (appMode !== 'single') return
+  if (g.phase !== 'meal_playing') return
+  if (g.turn !== 'p2') return
+  if (isEnded(g, 'p2')) return
+
+  const meal = meals[g.mealIndex]
+  const p2Total = calcCardsKcal(g.players.p2.cards)
+  const p1Total = calcCardsKcal(g.players.p1.cards)
+
+  if (p2Total < meal.threshold * 0.48) {
+    applyDraw(g, 'p2', ['荤', '素', '主食', '甜点'][Math.floor(Math.random() * 4)])
+  } else if (!g.players.p1.busted && !g.players.p1.stood && p2Total < p1Total - 50 && p2Total < meal.threshold - 80) {
+    applyDraw(g, 'p2', ['荤', '素', '主食', '甜点'][Math.floor(Math.random() * 4)])
+  } else if (Math.random() < 0.35 && p2Total < meal.threshold * 0.72) {
+    applyDraw(g, 'p2', ['荤', '素', '主食', '甜点'][Math.floor(Math.random() * 4)])
+  } else {
+    applyStand(g, 'p2')
+  }
+}
+
+function singleAfterPlayerAction() {
+  if (appMode !== 'single') return
+
+  if (game.phase === 'opening') {
+    aiOpeningIfNeeded(game)
+  }
+
+  let guard = 0
+  while (game.phase === 'meal_playing' && game.turn === 'p2' && guard < 12) {
+    aiTakeTurn(game)
+    guard += 1
+  }
+
+  if (game.phase === 'night_picking') {
+    while (getRemainingOrders(game, 'p2') > 0) {
+      const types = ['荤', '素', '主食', '甜点']
+      applyDraw(game, 'p2', types[Math.floor(Math.random() * 4)])
+    }
+  }
+}
+
+// =========================
+// 联机同步
+// =========================
+
+
+
+function getOnlineStatusByGame(g) {
+  if (g.phase === 'day_result') return 'finished'
+  if (g.phase === 'lobby') return 'lobby'
+  return 'playing'
+}
+
+function isGlobalActionAfterLocal(actionId, localGame) {
+  // 这些动作会改变整局公共状态，可以整包写入。
+  if (actionId === 'reveal_night') return true
+  if ((actionId === 'draw_meat' || actionId === 'draw_veg' || actionId === 'draw_staple' || actionId === 'draw_dessert' || actionId === 'stand') && localGame.phase === 'meal_result') return true
+  if (actionId === 'next' && localGame.phase !== 'meal_result') return true
+  if (actionId === 'replay_ready' && localGame.phase === 'opening') return true
+  return false
+}
+
+function buildOwnPatch(localGame, pid, actionSeq) {
+  const patch = {}
+
+  patch[`game/players/${pid}`] = normalizePlayerState(localGame.players[pid])
+  patch[`game/records/${pid}`] = normalizeRecord(localGame.records[pid])
+
+  // deck 可以更新，但就算两边同时写 deck，也不会覆盖玩家手牌。
+  patch['game/deck'] = safeArray(localGame.deck)
+
+  patch['game/phase'] = localGame.phase
+  patch['game/mealIndex'] = localGame.mealIndex
+  patch['game/turn'] = localGame.turn || null
+  patch['game/firstTurnPlayer'] = localGame.firstTurnPlayer || null
+  patch['game/message'] = localGame.message || ''
+  patch['game/comboMessage'] = localGame.comboMessage || ''
+  patch['game/actionSeq'] = actionSeq
+
+  if (localGame.nextReady) {
+    patch[`game/nextReady/${pid}`] = Boolean(localGame.nextReady[pid])
+  }
+
+  if (localGame.replayReady) {
+    patch[`game/replayReady/${pid}`] = Boolean(localGame.replayReady[pid])
+  }
+
+  return patch
+}
+
+function runPostSyncTransitions(g) {
+  const before = JSON.stringify({
+    phase: g.phase,
+    mealIndex: g.mealIndex,
+    turn: g.turn,
+    p1Cards: safeArray(g.players.p1.cards).length,
+    p2Cards: safeArray(g.players.p2.cards).length,
+    p1Stood: g.players.p1.stood,
+    p2Stood: g.players.p2.stood,
+    p1Night: safeArray(g.players.p1.nightChoices).length,
+    p2Night: safeArray(g.players.p2.nightChoices).length,
+    nextReady: g.nextReady,
+    replayReady: g.replayReady
+  })
+
+  if (g.phase === 'opening') {
+    enterMealPlayingIfReady(g)
+  } else if (g.phase === 'meal_playing') {
+    // v2.7：只有双方都主动开吃后，才进入结算。
+    if (g.players.p1.stood && g.players.p2.stood) {
+      settleMeal(g)
+    }
+  } else if (g.phase === 'night_picking') {
+    if (getRemainingOrders(g, 'p1') <= 0 && getRemainingOrders(g, 'p2') <= 0) {
+      g.phase = 'night_ready'
+      g.turn = null
+      g.message = '双方夜宵已选完，点击展示夜宵'
+    }
+  } else if (g.phase === 'meal_result') {
+    if (g.nextReady && g.nextReady.p1 && g.nextReady.p2) {
+      enterNextMeal(g)
+    }
+  } else if (g.phase === 'day_result') {
+    if (g.replayReady && g.replayReady.p1 && g.replayReady.p2) {
+      const fresh = createReplayGameFrom(g)
+      Object.keys(fresh).forEach(key => {
+        g[key] = fresh[key]
+      })
+    }
+  }
+
+  const after = JSON.stringify({
+    phase: g.phase,
+    mealIndex: g.mealIndex,
+    turn: g.turn,
+    p1Cards: safeArray(g.players.p1.cards).length,
+    p2Cards: safeArray(g.players.p2.cards).length,
+    p1Stood: g.players.p1.stood,
+    p2Stood: g.players.p2.stood,
+    p1Night: safeArray(g.players.p1.nightChoices).length,
+    p2Night: safeArray(g.players.p2.nightChoices).length,
+    nextReady: g.nextReady,
+    replayReady: g.replayReady
+  })
+
+  return before !== after
+}
+
+async function writeFullOnlineGame(nextGame) {
+  nextGame = normalizeGame(nextGame)
+  nextGame.actionSeq = Date.now()
+
+  game = nextGame
+  localGameActionSeq = nextGame.actionSeq
+  pendingWriteUntil = Date.now() + 900
+  requestRender()
+
+  await window.LiluOnline.updateRoom(roomId, {
+    game: nextGame,
+    status: getOnlineStatusByGame(nextGame)
+  })
+}
+
+
+async function saveOnlineGame() {
+  if (appMode !== 'online' || !roomId) return
+
+  const actionId = pendingActionId || ''
+  pendingActionId = ''
+
+  let local = normalizeGame(game)
+  const seq = Date.now()
+  local.actionSeq = seq
+
+  game = local
+  localGameActionSeq = seq
+  pendingWriteUntil = Date.now() + 900
+  requestRender()
+
+  // 结算、展示夜宵、进入下一餐这类“公共状态”动作，整包写入。
+  if (isGlobalActionAfterLocal(actionId, local)) {
+    await writeFullOnlineGame(local)
+    return
+  }
+
+  // 普通动作只写“自己的玩家状态”和必要共享字段，避免双方同时抽牌时互相覆盖。
+  await window.LiluOnline.updateRoom(roomId, buildOwnPatch(local, myPlayerId, seq))
+
+  // 写完后立刻读取一次最新房间，把双方状态合并，再判断是否可以自动推进阶段。
+  try {
+    const latestRoom = await window.LiluOnline.getRoom(roomId)
+
+    if (!latestRoom || !latestRoom.game) return
+
+    roomData = latestRoom
+    let merged = normalizeGame(latestRoom.game)
+
+    const changed = runPostSyncTransitions(merged)
+
+    if (changed) {
+      await writeFullOnlineGame(merged)
+    } else {
+      game = merged
+      localGameActionSeq = Math.max(localGameActionSeq, Number(merged.actionSeq || 0))
+      requestRender()
+    }
+  } catch (err) {
+    message = `同步失败：${err.message || err}`
+    requestRender()
+  }
+}
+
+async function createOnlineRoom() {
+  try {
+    if (!window.LiluOnline) {
+      message = '联机模块没有加载成功，请刷新页面'
+      render()
+      return
+    }
+
+    const initialGame = createGame('online')
+    initialGame.phase = 'lobby'
+    initialGame.message = '等待玩家2加入并准备'
+
+    const result = await window.LiluOnline.createRoom(initialGame)
+
+    appMode = 'online'
+    roomId = result.roomId
+    myPlayerId = result.playerId
+    localReadyLocked = false
+    startRequested = false
+    startOverlayText = ''
+    startOverlayUntil = 0
+    localGameActionSeq = 0
+    pendingWriteUntil = 0
+    pendingActionId = ''
+    game = normalizeGame(initialGame)
+    message = `房间创建成功：${roomId}`
+
+    if (unsubscribeRoom) unsubscribeRoom()
+
+    unsubscribeRoom = window.LiluOnline.listenRoom(roomId, data => {
+      roomData = data
+
+      if (data && data.game) {
+        const incomingGame = normalizeGame(data.game)
+        const incomingSeq = Number(incomingGame.actionSeq || 0)
+
+        // 本机刚点击后的极短时间内，如果轮询拿到旧快照，不要盖回去。
+        // 超过 pendingWriteUntil 后，无论如何接受数据库状态，避免因为时间戳差异卡死。
+        if (Date.now() > pendingWriteUntil || incomingSeq >= localGameActionSeq) {
+          game = incomingGame
+          localGameActionSeq = Math.max(localGameActionSeq, incomingSeq)
+        }
+      }
+
+      if (data && data.status === 'playing') {
+        startRequested = false
+      }
+
+      if (data && data.players && data.players[myPlayerId] && data.players[myPlayerId].ready) {
+        localReadyLocked = true
+      }
+
+      if (areBothPlayersReady() && (game.phase === 'lobby' || (data && data.status === 'lobby'))) {
+        showStartOverlay('双方已准备，正在开局...', 1400)
+        maybeStartOnlineGame()
+      }
+
+      render()
+    })
+
+    render()
+  } catch (err) {
+    message = `创建房间失败：${err.message || err}`
+    render()
+  }
+}
+
+async function joinOnlineRoom() {
+  try {
+    if (!window.LiluOnline) {
+      message = '联机模块没有加载成功，请刷新页面'
+      render()
+      return
+    }
+
+    const code = window.prompt('请输入房间码')
+    if (!code) return
+
+    const result = await window.LiluOnline.joinRoom(code)
+
+    appMode = 'online'
+    roomId = result.roomId
+    myPlayerId = result.playerId
+    localReadyLocked = false
+    startRequested = false
+    startOverlayText = ''
+    startOverlayUntil = 0
+    localGameActionSeq = 0
+    pendingWriteUntil = 0
+    pendingActionId = ''
+
+    if (unsubscribeRoom) unsubscribeRoom()
+
+    unsubscribeRoom = window.LiluOnline.listenRoom(roomId, data => {
+      roomData = data
+
+      if (data && data.game) {
+        const incomingGame = normalizeGame(data.game)
+        const incomingSeq = Number(incomingGame.actionSeq || 0)
+
+        // 本机刚点击后的极短时间内，如果轮询拿到旧快照，不要盖回去。
+        // 超过 pendingWriteUntil 后，无论如何接受数据库状态，避免因为时间戳差异卡死。
+        if (Date.now() > pendingWriteUntil || incomingSeq >= localGameActionSeq) {
+          game = incomingGame
+          localGameActionSeq = Math.max(localGameActionSeq, incomingSeq)
+        }
+      }
+
+      if (data && data.status === 'playing') {
+        startRequested = false
+      }
+
+      if (data && data.players && data.players[myPlayerId] && data.players[myPlayerId].ready) {
+        localReadyLocked = true
+      }
+
+      if (areBothPlayersReady() && (game.phase === 'lobby' || (data && data.status === 'lobby'))) {
+        showStartOverlay('双方已准备，正在开局...', 1400)
+        maybeStartOnlineGame()
+      }
+
+      render()
+    })
+
+    message = `已加入房间：${roomId}`
+    render()
+  } catch (err) {
+    message = `加入房间失败：${err.message || err}`
+    render()
+  }
+}
+
+async function playerReady() {
+  if (appMode !== 'online' || !roomId || !myPlayerId) return
+  if (isReadyLockedForMe()) return
+
+  localReadyLocked = true
+  showStartOverlay('你已准备，等待对方准备...', 900)
+  render()
+
+  await window.LiluOnline.updateRoom(roomId, {
+    [`players/${myPlayerId}/ready`]: true,
+    'game/message': `${getPlayerName(myPlayerId)}已准备`
+  })
+
+  const latest = await window.LiluOnline.getRoom(roomId)
+  roomData = latest
+
+  if (latest && latest.game) {
+    game = normalizeGame(latest.game)
+  }
+
+  render()
+  await maybeStartOnlineGame()
+}
+
+async function maybeStartOnlineGame() {
+  if (appMode !== 'online' || !roomId || !roomData) return
+  if (!areBothPlayersReady()) return
+
+  const status = roomData.status || ''
+  const phase = game.phase || ''
+
+  // 已经开始就不重复开局
+  if (status === 'playing' || phase !== 'lobby') return
+
+  // 两边可能几乎同时检测到“双方已准备”，用本地锁避免重复点火。
+  if (startRequested) return
+
+  startRequested = true
+  showStartOverlay('双方已准备，正在开局...', 1400)
+  render()
+
+  try {
+    const latest = await window.LiluOnline.getRoom(roomId)
+    if (!latest) throw new Error('房间不存在')
+
+    roomData = latest
+
+    const players = latest.players || {}
+    const bothReady = Boolean(players.p1 && players.p2 && players.p1.ready && players.p2.ready)
+
+    if (!bothReady) {
+      startRequested = false
+      render()
+      return
+    }
+
+    const latestGame = normalizeGame(latest.game)
+
+    // 如果另一边已经开局了，直接跟随，不重复覆盖
+    if (latest.status === 'playing' || latestGame.phase !== 'lobby') {
+      game = latestGame
+      render()
+      return
+    }
+
+    latestGame.phase = 'opening'
+    latestGame.message = '双方已准备：早餐起手阶段，双方各抽2张'
+    latestGame.mealIndex = 0
+    latestGame.turn = null
+    latestGame.actionSeq = Number(latestGame.actionSeq || 0) + 1
+    resetMealState(latestGame)
+    localGameActionSeq = latestGame.actionSeq
+
+    await window.LiluOnline.updateRoom(roomId, {
+      status: 'playing',
+      game: latestGame
+    })
+  } catch (err) {
+    startRequested = false
+    message = `开局失败：${err.message || err}`
+    render()
+  }
+}
+
+function leaveToHome() {
+  if (unsubscribeRoom) {
+    unsubscribeRoom()
+    unsubscribeRoom = null
+  }
+
+  appMode = 'home'
+  roomId = ''
+  myPlayerId = 'p1'
+  roomData = null
+  localReadyLocked = false
+  startRequested = false
+  startOverlayText = ''
+  startOverlayUntil = 0
+  localGameActionSeq = 0
+  pendingWriteUntil = 0
+  pendingActionId = ''
+  game = createGame('single')
+  message = ''
+  render()
+}
+
+// =========================
+// 渲染节流与图片预加载
+// =========================
+
+let renderScheduled = false
+resizeRenderReady = true
+
+function requestRender() {
+  if (renderScheduled) return
+  renderScheduled = true
+
+  const runner = () => {
+    renderScheduled = false
+    render()
+  }
+
+  if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+    window.requestAnimationFrame(runner)
+  } else {
+    setTimeout(runner, 16)
+  }
+}
+
+
+
+
+
+
+
+function retryFailedImages() {
+  Object.keys(imageFailedUntil).forEach(key => {
+    delete imageFailedUntil[key]
+  })
+  scheduleImageRender()
+}
+
+
+
+
+
+
+
+function preloadGameImages() {
+  const backs = Object.keys(CARD_BACK_PATHS).map(key => CARD_BACK_PATHS[key])
+  const fronts = Object.keys(CARD_IMAGE_PATHS).map(key => CARD_IMAGE_PATHS[key])
+
+  // 卡背优先，保证底牌/隐藏牌先有图。
+  backs.forEach(src => getImage(src, true))
+
+  // 正面卡图后台预热，不阻塞游戏流程。
+  // 保守分批，避免刚进入时和 UI 绘制抢主线程。
+  let index = 0
+
+  function step() {
+    const batchSize = 2
+
+    for (let i = 0; i < batchSize && index < fronts.length; i++) {
+      getImage(fronts[index], false)
+      index += 1
+    }
+
+    if (index < fronts.length) {
+      setTimeout(step, 160)
+    }
+  }
+
+  setTimeout(step, 240)
+}
+
+
+let imageRenderTimer = null
+
+function scheduleImageRender() {
+  if (imageRenderTimer) return
+
+  imageRenderTimer = setTimeout(() => {
+    imageRenderTimer = null
+    requestRender()
+  }, 90)
+}
+
+// =========================
+// 餐段背景与小卡绘制
+// =========================
+
+function getMealTheme(index) {
+  const i = Number(index || 0)
+  if (i === 0) {
+    return {
+      bg: '#FFF5C7',
+      panel: '#FFFDF0',
+      opponentPanel: '#F4EED7',
+      center: '#FFF2C5',
+      accent: '#FFE169',
+      text: '#111'
+    }
+  }
+
+  if (i === 1) {
+    return {
+      bg: '#FFD85E',
+      panel: '#FFF7D7',
+      opponentPanel: '#F1D890',
+      center: '#FFE98A',
+      accent: '#FFB53D',
+      text: '#111'
+    }
+  }
+
+  if (i === 2) {
+    return {
+      bg: '#17294C',
+      panel: '#F6F8FF',
+      opponentPanel: '#DCE5FF',
+      center: '#EAF0FF',
+      accent: '#4E77C8',
+      text: '#111'
+    }
+  }
+
+  return {
+    bg: '#101010',
+    panel: '#F7F1E8',
+    opponentPanel: '#D8D0C4',
+    center: '#EFE6DA',
+    accent: '#111',
+    text: '#111'
+  }
+}
+
+function getPageBg() {
+  if (appMode === 'home' || !game) return '#F7F1E8'
+  return getMealTheme(game.mealIndex).bg
+}
+
+function getMealCardsFromResult(result, pid) {
+  if (!result) return []
+  return pid === 'p1' ? safeArray(result.p1Cards) : safeArray(result.p2Cards)
+}
+
+function drawTinyCards(cards, x, y, areaW, areaH, maxSize) {
+  const list = safeArray(cards)
+  if (list.length === 0) {
+    drawText('无外卖', x, y + 8, 12, '#777', 'left', 'bold')
+    return
+  }
+
+  const gap = 3
+  let cardW = maxSize || 38
+  const perRow = Math.max(3, Math.floor((areaW + gap) / (cardW + gap)))
+
+  const rows = Math.ceil(list.length / perRow)
+  const maxH = Math.floor((areaH - gap * Math.max(0, rows - 1)) / rows)
+
+  let cardH = Math.min(Math.round(cardW * 1121 / 671), Math.max(34, maxH))
+  cardW = Math.round(cardH * 671 / 1121)
+
+  for (let i = 0; i < list.length; i++) {
+    const row = Math.floor(i / perRow)
+    const col = i % perRow
+    const yy = y + row * (cardH + gap)
+    if (yy + cardH > y + areaH) break
+    const card = { ...list[i], hidden: false }
+    drawCard(card, x + col * (cardW + gap), yy, cardW, cardH)
+  }
+}
+
+
+function drawCompactMealCards(title, cards, total, busted, x, y, w, h) {
+  drawRoundRect(x, y, w, h, 16, '#FFFFFF', '#111', 2.2)
+  drawText(title, x + 12, y + 10, 15, '#111', 'left', 'bold')
+
+  const bustedText = busted ? (lang === 'en' ? ' Bust' : ' 爆') : ''
+  drawText(`${total} ${t('kcal')}${bustedText}`, x + w - 12, y + 11, 13, busted ? '#E94335' : '#111', 'right', 'bold')
+
+  drawTinyCards(cards, x + 12, y + 34, w - 24, h - 42, 34)
+}
+
+
+
+
+// =========================
+// 绘图工具
+// =========================
+
+function drawRoundRect(x, y, w, h, r, fillStyle, strokeStyle, lineWidth) {
+  const radius = Math.min(r, w / 2, h / 2)
+
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + w - radius, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+  ctx.lineTo(x + w, y + h - radius)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+  ctx.lineTo(x + radius, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+
+  if (fillStyle) {
+    ctx.fillStyle = fillStyle
+    ctx.fill()
+  }
+
+  if (strokeStyle) {
+    ctx.strokeStyle = strokeStyle
+    ctx.lineWidth = lineWidth || 2
+    ctx.stroke()
+  }
+}
+
+function drawText(text, x, y, size, color, align, weight) {
+  ctx.fillStyle = color || '#111'
+  ctx.font = `${weight || 'normal'} ${size}px sans-serif`
+  ctx.textAlign = align || 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText(String(text), x, y)
+}
+
+function wrapText(text, x, y, maxWidth, lineHeight, size, color, weight, maxLines) {
+  ctx.font = `${weight || 'normal'} ${size}px sans-serif`
+  ctx.fillStyle = color || '#111'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+
+  let line = ''
+  let yy = y
+  let lines = 0
+  const chars = String(text || '').split('')
+
+  for (let i = 0; i < chars.length; i++) {
+    const testLine = line + chars[i]
+    if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+      ctx.fillText(line, x, yy)
+      lines += 1
+      if (maxLines && lines >= maxLines) return yy + lineHeight
+      line = chars[i]
+      yy += lineHeight
+    } else {
+      line = testLine
+    }
+  }
+
+  ctx.fillText(line, x, yy)
+  return yy + lineHeight
+}
+
+
+function addButton(id, text, x, y, w, h, fill, color, fontSize) {
+  buttons.push({ id, x, y, w, h })
+
+  const now = Date.now()
+  const pulseStart = buttonPulse[id] || 0
+  const elapsed = now - pulseStart
+  let scale = 1
+
+  if (elapsed >= 0 && elapsed < BUTTON_PULSE_MS) {
+    const t = elapsed / BUTTON_PULSE_MS
+    scale = 1 + 0.055 * Math.sin(Math.PI * t)
+  }
+
+  const cx = x + w / 2
+  const cy = y + h / 2
+  const sx = cx - (w * scale) / 2
+  const sy = cy - (h * scale) / 2
+  const sw = w * scale
+  const sh = h * scale
+
+  drawRoundRect(sx + 4, sy + 5, sw, sh, 14, '#111', null, 0)
+  drawRoundRect(sx, sy, sw, sh, 14, fill || '#111', '#111', 2.5)
+  drawText(text, cx, cy - (fontSize || 18) / 2, fontSize || 18, color || '#fff', 'center', 'bold')
+}
+
+function hitButton(x, y) {
+  for (let i = buttons.length - 1; i >= 0; i--) {
+    const b = buttons[i]
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b.id
+  }
+  return null
+}
+
+// 图片懒加载
+const imageCache = {}
+const imageFailedUntil = {}
+const IMAGE_RETRY_DELAY = 900
+
+
+
+
+
+
+
+
+
+function getImage(src, priority) {
+  if (!src) return null
+
+  const cached = imageCache[src]
+
+  // 只缓存“已加载成功”或“正在加载中”的图片。
+  // 失败图片不永久缓存，避免某些 iPhone 一次失败后永远显示不出来。
+  if (cached && (cached.loaded || cached.loading)) return cached
+
+  const now = Date.now()
+  if (imageFailedUntil[src] && now < imageFailedUntil[src]) {
+    return null
+  }
+
+  const img = new Image()
+  img.loaded = false
+  img.loading = true
+  img.failed = false
+  img.decoding = 'async'
+  img.loading = 'eager'
+
+  img.onload = () => {
+    img.loaded = true
+    img.loading = false
+    img.failed = false
+    delete imageFailedUntil[src]
+    scheduleImageRender()
+  }
+
+  img.onerror = () => {
+    img.loaded = false
+    img.loading = false
+    img.failed = true
+
+    // 失败后立即从缓存删除，只短暂冷却，之后当前画面需要它时会重新请求。
+    delete imageCache[src]
+    imageFailedUntil[src] = Date.now() + IMAGE_RETRY_DELAY
+
+    setTimeout(() => {
+      if (imageFailedUntil[src] && Date.now() >= imageFailedUntil[src]) {
+        delete imageFailedUntil[src]
+        scheduleImageRender()
+      }
+    }, IMAGE_RETRY_DELAY + 80)
+
+    scheduleImageRender()
+  }
+
+  // 保持最稳定的原始路径，不加 ?v，不 decode，不等待 loading。
+  img.src = src
+
+  imageCache[src] = img
+  return img
+}
+
+
+
+
+function drawCard(card, x, y, w, h) {
+  const type = normalizeType(card)
+  const src = card.hidden ? (CARD_BACK_PATHS[type] || CARD_BACK_PATHS['荤']) : CARD_IMAGE_PATHS[card.name]
+  const img = getImage(src, true)
+
+  if (img && img.loaded) {
+    const radius = 9
+    ctx.save()
+
+    ctx.beginPath()
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + w - radius, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+    ctx.lineTo(x + w, y + h - radius)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+    ctx.lineTo(x + radius, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+    ctx.lineTo(x, y + radius)
+    ctx.quadraticCurveTo(x, y, x + radius, y)
+    ctx.closePath()
+    ctx.clip()
+
+    const imageRatio = 671 / 1121
+    const boxRatio = w / h
+    let drawW = w
+    let drawH = h
+
+    if (boxRatio > imageRatio) {
+      drawW = w
+      drawH = w / imageRatio
+    } else {
+      drawH = h
+      drawW = h * imageRatio
+    }
+
+    drawW *= card.hidden ? 1.06 : 1.08
+    drawH *= card.hidden ? 1.06 : 1.08
+
+    ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH)
+    ctx.restore()
+
+    if (!card.hidden) drawRoundRect(x, y, w, h, radius, null, '#111', 2)
+    return
+  }
+
+  // 图片未就绪时，只做轻量占位，不影响玩法。
+  drawRoundRect(x, y, w, h, 10, TYPE_COLORS[type] || '#fff', '#111', 2)
+  drawText(card.hidden ? '背面' : String(card.name || '').slice(0, 4), x + w / 2, y + h / 2 - 12, Math.max(9, Math.min(12, w / 4)), '#111', 'center', 'bold')
+  if (!card.hidden) drawText(`${card.kcal}kcal`, x + w / 2, y + h / 2 + 6, Math.max(8, Math.min(11, w / 5)), '#111', 'center', 'bold')
+}
+
+
+function drawCards(cards, x, y, areaW, areaH) {
+  const list = safeArray(cards)
+  if (list.length === 0) return
+
+  const gap = 4
+  let cardW = 64
+  if (list.length > 4) cardW = 54
+  if (list.length > 6) cardW = 47
+  if (list.length > 8) cardW = 42
+  if (list.length > 10) cardW = 38
+
+  const perRow = Math.max(3, Math.floor((areaW + gap) / (cardW + gap)))
+  const rows = Math.ceil(list.length / perRow)
+  const maxH = Math.floor((areaH - gap * (rows - 1)) / rows)
+  const cardH = Math.min(Math.round(cardW * 1121 / 671), maxH)
+  cardW = Math.round(cardH * 671 / 1121)
+
+  for (let i = 0; i < list.length; i++) {
+    const row = Math.floor(i / perRow)
+    const col = i % perRow
+    drawCard(list[i], x + col * (cardW + gap), y + row * (cardH + gap), cardW, cardH)
+  }
+}
+
+// =========================
+// 画面
+// =========================
+
+
+
+function drawHome() {
+  const panelX = 24
+  const panelY = SAFE_TOP + 26
+  const panelW = W - 48
+  const bottomButtonsH = 172
+  const panelH = Math.max(360, H - panelY - bottomButtonsH - SAFE_BOTTOM - 18)
+
+  drawRoundRect(-40, H - 220, 160, 160, 36, '#A9F0D1', null, 0)
+  drawRoundRect(W - 92, SAFE_TOP + 90, 130, 130, 32, '#FF9BB4', null, 0)
+  drawRoundRect(panelX, panelY, panelW, panelH, 28, '#FFFFFF', '#111', 4)
+
+  if (!rulesExpanded) {
+    drawText(t('title'), W / 2, panelY + 28, lang === 'en' ? 43 : 48, '#111', 'center', 'bold')
+    drawText('LILU CARDS', W / 2, panelY + 90, 16, '#555', 'center', 'bold')
+
+    drawRoundRect(W / 2 - 104, panelY + 126, 208, 40, 18, '#111', null, 0)
+    drawText(t('subtitle'), W / 2, panelY + 136, lang === 'en' ? 14 : 17, '#FFE169', 'center', 'bold')
+
+    drawText(t('slogan'), W / 2, panelY + 212, lang === 'en' ? 23 : 28, '#111', 'center', 'bold')
+    drawText(t('modes'), W / 2, panelY + 254, 15, '#555', 'center', 'bold')
+
+    const ruleBtnW = Math.min(panelW - 64, 220)
+    addButton('rules_toggle', t('howToPlay'), W / 2 - ruleBtnW / 2, panelY + panelH - 64, ruleBtnW, 42, '#FFFFFF', '#111', 16)
+  } else {
+    drawText(t('rules'), panelX + 24, panelY + 20, 28, '#111', 'left', 'bold')
+    addButton('rules_toggle', t('close'), panelX + panelW - 92, panelY + 18, 68, 34, '#111', '#fff', 14)
+
+    const viewX = panelX + 24
+    const viewY = panelY + 66
+    const viewW = panelW - 48
+    const viewH = panelH - 88
+    const lines = t('rulesLines')
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(viewX, viewY, viewW, viewH)
+    ctx.clip()
+
+    let yy = viewY - rulesScroll
+    const startY = yy
+
+    lines.forEach(line => {
+      yy = wrapText(line, viewX, yy, viewW, 18, 12, '#333', 'bold', 4)
+      yy += 8
+    })
+
+    const contentH = yy - startY
+    rulesMaxScroll = Math.max(0, contentH - viewH + 18)
+    rulesScroll = Math.max(0, Math.min(rulesScroll, rulesMaxScroll))
+
+    ctx.restore()
+
+    if (rulesMaxScroll > 0) {
+      const barH = Math.max(28, viewH * viewH / (contentH || viewH))
+      const barY = viewY + (viewH - barH) * (rulesScroll / rulesMaxScroll)
+
+      drawRoundRect(viewX + viewW + 6, barY, 4, barH, 3, '#111', null, 0)
+      drawText(lang === 'en' ? 'Swipe' : '上下滑动', W / 2, panelY + panelH - 18, 10, '#777', 'center', 'bold')
+    }
+  }
+
+  const bottomY = H - SAFE_BOTTOM - 154
+
+  addButton('single_start', t('solo'), 32, bottomY, W - 64, 54, '#111', '#fff', 22)
+
+  const gap = 12
+  const halfW = (W - 64 - gap) / 2
+
+  addButton('online_create', t('create'), 32, bottomY + 68, halfW, 54, '#FFE169', '#111', lang === 'en' ? 16 : 20)
+  addButton('online_join', t('join'), 32 + halfW + gap, bottomY + 68, halfW, 54, '#9EDBFF', '#111', lang === 'en' ? 16 : 20)
+
+  if (message) wrapText(message, 32, H - SAFE_BOTTOM - 24, W - 64, 14, 11, '#E94335', 'bold', 1)
+}
+
+
+
+
+
+function drawHomeMiniButton() {
+  if (appMode === 'home') return
+
+  const y = Math.max(3, SAFE_TOP - 11)
+  const w = lang === 'en' ? 46 : 38
+
+  addButton('home', t('home'), W - w - 8, y, w, 22, '#FFFFFF', '#111', 9)
+}
+
+function drawTopBadge() {
+  if (appMode !== 'online') return
+  const text = roomId ? `房间 ${roomId}｜你是${getPlayerName(myPlayerId)}` : '联机模式'
+  const w = Math.min(W - 32, 240)
+  drawRoundRect(W / 2 - w / 2, SAFE_TOP, w, 26, 13, '#111', null, 0)
+  drawText(text, W / 2, SAFE_TOP + 6, 11, '#fff', 'center', 'bold')
+}
+
+function getDisplayPlayerIds() {
+  const self = getSelfId()
+  return {
+    self,
+    opponent: otherPlayer(self)
+  }
+}
+
+
+
+
+
+function drawPlayerPanel(pid, label, x, y, w, h, isOpponent) {
+  const player = game.players[pid]
+  const meal = getMeal()
+  const inResultPhase = game.phase === 'meal_result' || game.phase === 'day_result'
+  const hiddenForOpponent = isOpponent && !inResultPhase
+
+  const displayCards = safeArray(player.cards).map((card, index) => {
+    const next = { ...card }
+
+    if (hiddenForOpponent && next.privateCard) {
+      next.hidden = true
+    } else if (!inResultPhase) {
+      next.hidden = false
+    }
+
+    return next
+  })
+
+  const total = calcCardsKcal(player.cards)
+  const visibleTotal = hiddenForOpponent ? getVisibleKcal(displayCards) : total
+  const theme = getMealTheme(game.mealIndex)
+  const bg = isOpponent ? theme.opponentPanel : theme.panel
+
+  let status = t('watching')
+
+  if (hiddenForOpponent) {
+    status = player.stood
+      ? t('stood')
+      : game.phase === 'meal_playing' && game.turn === pid
+        ? t('ordering')
+        : game.phase === 'opening'
+          ? t('opening')
+          : t('watching')
+  } else {
+    status = player.busted || isBusted(game, pid)
+      ? t('busted')
+      : player.stood
+        ? t('stood')
+        : game.phase === 'meal_playing' && game.turn === pid
+          ? t('ordering')
+          : game.phase === 'opening'
+            ? t('opening')
+            : t('watching')
+  }
+
+  drawRoundRect(x, y, w, h, 22, bg, '#111', 3)
+  drawText(label, x + 16, y + 12, H < 720 ? 21 : 24, '#111', 'left', 'bold')
+  drawText(status, x + 72, y + 18, H < 720 ? 12 : 14, status === t('busted') ? '#E94335' : '#111', 'left', 'bold')
+
+  const kcalText = hiddenForOpponent
+    ? `${t('unknownKcal')}${visibleTotal} ${t('kcal')}`
+    : `${total}/${meal.threshold} ${t('kcal')}`
+
+  drawText(kcalText, x + w - 16, y + 15, H < 720 ? 13 : 16, status === t('busted') ? '#E94335' : '#111', 'right', 'bold')
+  drawText(`${t('orders')} ${game.records[pid].dayOrdersUsed}/${TOTAL_ORDERS_PER_DAY}`, x + 16, y + 44, H < 720 ? 11 : 13, '#666', 'left', 'bold')
+
+  const dayText = hiddenForOpponent
+    ? `${t('settledKcal')} ${getDayTotalKcal(game, pid)}`
+    : `${t('totalKcal')} ${getDayTotalKcal(game, pid) + (inResultPhase ? 0 : total)}`
+
+  drawText(dayText, x + 108, y + 44, H < 720 ? 11 : 13, '#111', 'left', 'bold')
+
+  let cardsToDraw = displayCards
+
+  if ((game.phase === 'night_picking' || game.phase === 'night_ready') && safeArray(player.nightChoices).length > 0) {
+    cardsToDraw = safeArray(player.nightChoices).map((type, index) => ({
+      id: `night_${index}`,
+      name: `${t('night')}${index + 1}`,
+      type,
+      kcal: 0,
+      hidden: true,
+      privateCard: false
+    }))
+  }
+
+  drawCards(cardsToDraw, x + 14, y + 72, w - 28, h - 86)
+}
+
+
+
+
+
+
+
+function drawCenterPanel(x, y, w, h) {
+  const meal = getMeal()
+  const selfId = getSelfId()
+  const selfTotal = calcCardsKcal(game.players[selfId].cards)
+  const ratio = Math.max(0, Math.min(1, selfTotal / meal.threshold))
+  const theme = getMealTheme(game.mealIndex)
+
+  drawRoundRect(x, y, w, h, 18, theme.center, '#111', 3)
+  drawText(`${game.mealIndex + 1}/4  ${mealName(game.mealIndex)}`, x + 16, y + 10, H < 720 ? 17 : 19, '#111', 'left', 'bold')
+
+  const barX = x + 16
+  const barY = y + Math.max(34, Math.floor(h * 0.48))
+  const barW = w - 32
+  const barH = H < 720 ? 18 : 20
+  const r = barH / 2
+
+  ctx.save()
+  drawRoundRect(barX, barY, barW, barH, r, '#FFFFFF', null, 0)
+  ctx.beginPath()
+  ctx.rect(barX, barY, barW, barH)
+  ctx.clip()
+
+  const fillColor = selfTotal >= meal.threshold
+    ? '#E94335'
+    : ratio > 0.78
+      ? '#FF7A3D'
+      : '#FFE169'
+
+  ctx.fillStyle = fillColor
+  ctx.fillRect(barX, barY, barW * ratio, barH)
+  ctx.restore()
+
+  drawRoundRect(barX, barY, barW, barH, r, null, '#111', 2.5)
+  drawText(`${t('warning')} ${meal.threshold}`, barX + barW / 2, barY + (H < 720 ? 3 : 4), H < 720 ? 10 : 11, '#111', 'center', 'bold')
+}
+
+
+
+
+
+function drawActionButtons() {
+  const y = H - SAFE_BOTTOM - 84
+  const gap = 10
+  const leftW = Math.floor((W - 32) * 0.52)
+  const rightW = W - 32 - leftW - gap
+  const leftX = 16
+  const smallGap = 8
+  const smallW = (leftW - smallGap) / 2
+  const smallH = (72 - smallGap) / 2
+  const selfId = getSelfId()
+
+  const drawTypeButtons = canAct => {
+    const disabledFill = '#ddd'
+    const disabledColor = '#666'
+
+    addButton(canAct ? 'draw_meat' : 'noop', t('meat'), leftX, y, smallW, smallH, canAct ? TYPE_COLORS['荤'] : disabledFill, canAct ? '#111' : disabledColor, 16)
+    addButton(canAct ? 'draw_veg' : 'noop', t('veg'), leftX + smallW + smallGap, y, smallW, smallH, canAct ? TYPE_COLORS['素'] : disabledFill, canAct ? '#111' : disabledColor, 16)
+    addButton(canAct ? 'draw_staple' : 'noop', t('staple'), leftX, y + smallH + smallGap, smallW, smallH, canAct ? TYPE_COLORS['主食'] : disabledFill, canAct ? '#111' : disabledColor, 16)
+    addButton(canAct ? 'draw_dessert' : 'noop', t('dessert'), leftX + smallW + smallGap, y + smallH + smallGap, smallW, smallH, canAct ? TYPE_COLORS['甜点'] : disabledFill, canAct ? '#111' : disabledColor, 16)
+  }
+
+  if (appMode === 'online' && (!roomData || roomData.status === 'lobby' || game.phase === 'lobby')) {
+    drawTypeButtons(false)
+
+    const ready = isReadyLockedForMe()
+    addButton(ready ? 'noop' : 'ready', ready ? t('ready') : t('readyBtn'), leftX + leftW + gap, y, rightW, 72, '#FFE169', '#111', 22)
+    return
+  }
+
+  if (game.phase === 'night_ready') {
+    drawTypeButtons(false)
+    addButton('reveal_night', t('reveal'), leftX + leftW + gap, y, rightW, 72, '#FFE169', '#111', lang === 'en' ? 18 : 22)
+    return
+  }
+
+  const canAct = canPlayerAct(game, selfId)
+  drawTypeButtons(canAct)
+
+  let standText = t('eat')
+  let standSub = ''
+
+  if (game.phase === 'opening') {
+    standText = t('opening')
+    standSub = t('draw2')
+  } else if (game.phase === 'night_picking') {
+    standText = t('night')
+    standSub = t('pickAll')
+  } else if (game.phase === 'meal_playing') {
+    if (game.turn === selfId) {
+      standText = t('eat')
+      standSub = (game.players[selfId].busted || isBusted(game, selfId)) ? t('busted') : t('yourTurn')
+    } else {
+      standText = t('wait')
+      standSub = t('rivalOrdering')
+    }
+  }
+
+  addButton(game.phase === 'meal_playing' && game.turn === selfId ? 'stand' : 'noop', standText, leftX + leftW + gap, y, rightW, 72, '#FFE169', '#111', lang === 'en' ? 18 : 24)
+
+  if (standSub) drawText(standSub, leftX + leftW + gap + rightW / 2, y + 50, 10, '#5C4300', 'center', 'bold')
+}
+
+
+
+
+function drawGameScreen() {
+  const ids = getDisplayPlayerIds()
+  const centerH = H < 720 ? 76 : 86
+  const gap = H < 720 ? 8 : 10
+  const actionH = 92
+
+  // 顶部按钮安全区：给 Music / 中英文 / Home 独立留空间，避免压住对手面板。
+  const topControlsH = 38
+  const topY = Math.max(SAFE_TOP + topControlsH, 50)
+
+  const availableH = H - topY - actionH - SAFE_BOTTOM - 12
+  const panelH = Math.max(145, Math.floor((availableH - centerH - gap * 2) / 2))
+
+  const oppY = topY
+  const centerY = oppY + panelH + gap
+  const selfY = centerY + centerH + gap
+
+  if (appMode === 'online' && roomId) {
+    const pLabel = selfPlayerId === 'p1'
+      ? (lang === 'en' ? 'P1' : '玩家1')
+      : (lang === 'en' ? 'P2' : '玩家2')
+    const roomLabel = lang === 'en' ? 'Room' : '房间'
+
+    drawRoundRect(W / 2 - 110, Math.max(6, SAFE_TOP - 6), 220, 26, 13, '#111', null, 0)
+    drawText(`${roomLabel} ${roomId}｜${pLabel}`, W / 2, Math.max(11, SAFE_TOP - 1), 11, '#fff', 'center', 'bold')
+  }
+
+  drawPlayerPanel(ids.opponent, t('opponent'), 16, oppY, W - 32, panelH, true)
+  drawCenterPanel(16, centerY, W - 32, centerH)
+  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, panelH, false)
+
+  drawWaitingOpponentFloat()
+  drawActionButtons()
+}
+
+
+
+
+
+
+function applyRevealNight(g) {
+  if (g.phase !== 'night_ready') return
+
+  revealNightAndSettle(g)
+  g.actionSeq += 1
+}
+
+
+
+
+function drawWaitingOpponentFloat() {
+  if (appMode !== 'online') return
+  if (game.phase !== 'meal_playing') return
+
+  const selfId = getSelfId()
+  const oppId = otherPlayer(selfId)
+
+  if (game.turn !== oppId) return
+  if (game.players[selfId] && game.players[selfId].stood) return
+
+  const boxW = Math.min(W - 96, 250)
+  const boxH = H < 720 ? 58 : 66
+  const x = (W - boxW) / 2
+  const y = Math.max(SAFE_TOP + 90, Math.min(H * 0.26, SAFE_TOP + 150))
+
+  ctx.save()
+  ctx.globalAlpha = 0.97
+  drawRoundRect(x + 5, y + 6, boxW, boxH, 22, '#111', null, 0)
+  drawRoundRect(x, y, boxW, boxH, 22, '#FFF6E8', '#111', 3)
+  ctx.restore()
+
+  drawText(t('rivalOrdering'), W / 2, y + 10, H < 720 ? 18 : 21, '#111', 'center', 'bold')
+  drawText(t('waitRival'), W / 2, y + (H < 720 ? 38 : 44), 11, '#555', 'center', 'bold')
+}
+
+
+
+
+function drawMealResult() {
+  const result = game.lastMealResult
+
+  if (!result) {
+    drawText(t('result'), 24, SAFE_TOP + 10, 28, '#111', 'left', 'bold')
+    addButton('next', lang === 'en' ? 'Continue' : '继续', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    return
+  }
+
+  const selfId = getSelfId()
+  const oppId = otherPlayer(selfId)
+
+  let verdict = t('mealDraw')
+  let quote = t('quoteDraw')
+
+  if (result.winner === selfId) {
+    verdict = t('youWonMeal')
+    quote = t('quoteWin')
+  } else if (result.winner === oppId) {
+    verdict = t('youLostMeal')
+    quote = t('quoteLose')
+  }
+
+  const selfScore = getMealTotalPoint(game, selfId)
+  const oppScore = getMealTotalPoint(game, oppId)
+
+  const selfCards = getMealCardsFromResult(result, selfId)
+  const oppCards = getMealCardsFromResult(result, oppId)
+
+  const selfTotal = selfId === 'p1' ? result.p1Total : result.p2Total
+  const oppTotal = oppId === 'p1' ? result.p1Total : result.p2Total
+  const selfBusted = selfId === 'p1' ? result.p1Busted : result.p2Busted
+  const oppBusted = oppId === 'p1' ? result.p1Busted : result.p2Busted
+
+  const panelW = W - 48
+  const panelH = Math.min(520, H - SAFE_TOP - SAFE_BOTTOM - 112)
+  const x = 24
+  const y = SAFE_TOP + 48
+
+  drawRoundRect(x, y, panelW, panelH, 28, '#FFFFFF', '#111', 4)
+
+  drawText(`${mealName(result.mealIndex)} ${t('result')}`, W / 2, y + 24, 24, '#111', 'center', 'bold')
+  drawText(verdict, W / 2, y + 62, lang === 'en' ? 28 : 34, result.winner === selfId ? '#E94335' : '#111', 'center', 'bold')
+  drawText(quote, W / 2, y + 108, lang === 'en' ? 14 : 16, '#555', 'center', 'bold')
+
+  drawRoundRect(W / 2 - 96, y + 138, 192, 44, 22, '#FFF6E8', '#111', 3)
+  drawText(`${t('you')} ${selfScore} : ${oppScore} ${t('opponent')}`, W / 2, y + 150, lang === 'en' ? 17 : 22, '#111', 'center', 'bold')
+
+  const cardAreaY = y + 202
+  const cardPanelH = Math.max(108, Math.min(150, (panelH - 260) / 2))
+
+  drawCompactMealCards(t('rivalOrders'), oppCards, oppTotal, oppBusted, x + 16, cardAreaY, panelW - 32, cardPanelH)
+  drawCompactMealCards(t('yourOrders'), selfCards, selfTotal, selfBusted, x + 16, cardAreaY + cardPanelH + 10, panelW - 32, cardPanelH)
+
+  if (appMode === 'online') {
+    const nextReady = game.nextReady || { p1: false, p2: false }
+    const statusText = lang === 'en'
+      ? `Confirm: ${t('you')} ${nextReady[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${nextReady[oppId] ? t('ready') : t('notReady')}`
+      : `确认状态：${t('you')} ${nextReady[selfId] ? '已确认' : '未确认'}｜${t('opponent')} ${nextReady[oppId] ? '已确认' : '未确认'}`
+
+    drawText(statusText, W / 2, y + panelH - 30, 12, '#E94335', 'center', 'bold')
+  }
+
+  const nextReady = game.nextReady || { p1: false, p2: false }
+  const nextName = game.mealIndex >= 3 ? t('finalResult') : mealName(game.mealIndex + 1)
+
+  if (appMode === 'online') {
+    const alreadyReady = Boolean(nextReady[selfId])
+    addButton(alreadyReady ? 'noop' : 'next', alreadyReady ? t('confirmedWait') : `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 17 : 19)
+  } else {
+    addButton('next', `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 18 : 22)
+  }
+}
+
+
+
+function drawResultPlayer(title, pid, y, h) {
+  const result = game.lastMealResult
+  const cards = pid === 'p1' ? result.p1Cards : result.p2Cards
+  const total = pid === 'p1' ? result.p1Total : result.p2Total
+  const busted = pid === 'p1' ? result.p1Busted : result.p2Busted
+  const combo = pid === 'p1' ? result.p1Combo : result.p2Combo
+  const point = pid === 'p1' ? result.p1Point : result.p2Point
+
+  drawRoundRect(20, y, W - 40, h, 20, '#FFFFFF', '#111', 3)
+  drawText(title, 38, y + 12, 20, '#111', 'left', 'bold')
+  drawText(`${total}/${result.threshold} kcal`, W - 38, y + 14, 16, busted ? '#E94335' : '#111', 'right', 'bold')
+  drawText(busted ? '状态：爆牌' : '状态：未爆牌', 38, y + 42, 13, busted ? '#E94335' : '#333', 'left', 'bold')
+  drawText(`本餐点数 +${point}`, W - 38, y + 42, 13, '#E94335', 'right', 'bold')
+
+  const comboText = busted ? '爆牌不触发组合' : combo ? combo.resultText : '无组合'
+  wrapText(`组合：${comboText}`, 38, y + 62, W - 76, 16, 12, '#555', 'bold', 2)
+
+  drawCards(cards, 38, y + 96, W - 76, h - 110)
+}
+
+
+
+
+
+function drawDayResult() {
+  const selfId = getSelfId()
+  const oppId = otherPlayer(selfId)
+  const selfPoint = getFinalPoint(game, selfId)
+  const oppPoint = getFinalPoint(game, oppId)
+  const selfKcal = getDayTotalKcal(game, selfId)
+  const oppKcal = getDayTotalKcal(game, oppId)
+
+  let finalText = t('finalDraw')
+  let finalSubText = t('finalDrawSub')
+
+  if (selfPoint > oppPoint) {
+    finalText = t('finalWin')
+    finalSubText = t('finalWinSub')
+  } else if (selfPoint < oppPoint) {
+    finalText = t('finalLose')
+    finalSubText = t('finalLoseSub')
+  }
+
+  const selfWin = selfPoint > oppPoint
+  const oppWin = oppPoint > selfPoint
+  const selfColor = selfWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
+  const oppColor = oppWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
+
+  const topY = SAFE_TOP + 42
+  const topH = lang === 'en' ? 140 : 126
+
+  drawRoundRect(20, topY, W - 40, topH, 22, '#FFFFFF', '#111', 3)
+  drawText(finalText, W / 2, topY + 22, lang === 'en' ? 30 : 27, selfWin ? '#E94335' : '#111', 'center', 'bold')
+  drawText(finalSubText, W / 2, topY + 60, 13, '#555', 'center', 'bold')
+
+  drawText(`${t('you')} ${selfPoint} : ${oppPoint} ${t('opponent')}`, W / 2, topY + 88, lang === 'en' ? 20 : 22, '#111', 'center', 'bold')
+  drawText(`${selfKcal} ${t('kcal')}`, W * 0.28, topY + 114, 16, selfColor, 'center', 'bold')
+  drawText(`${oppKcal} ${t('kcal')}`, W * 0.72, topY + 114, 16, oppColor, 'center', 'bold')
+
+  const results = safeArray(game.mealResults)
+  let y = topY + topH + 20
+  const bottomLimit = H - SAFE_BOTTOM - 104
+  const blockH = Math.max(92, Math.min(116, (bottomLimit - y - 18) / meals.length))
+
+  for (let i = 0; i < meals.length; i++) {
+    const res = results[i]
+
+    drawRoundRect(20, y, W - 40, blockH, 16, '#FFFFFF', '#111', 2)
+    drawText(mealName(i), 34, y + 10, lang === 'en' ? 20 : 16, '#111', 'left', 'bold')
+
+    if (!res) {
+      drawText(t('noRecord'), W / 2, y + 42, 13, '#777', 'center', 'bold')
+      y += blockH + 8
+      continue
+    }
+
+    const selfCards = getMealCardsFromResult(res, selfId)
+    const oppCards = getMealCardsFromResult(res, oppId)
+    const selfRaw = selfId === 'p1' ? res.p1Total : res.p2Total
+    const oppRaw = oppId === 'p1' ? res.p1Total : res.p2Total
+    const selfBusted = selfId === 'p1' ? res.p1Busted : res.p2Busted
+    const oppBusted = oppId === 'p1' ? res.p1Busted : res.p2Busted
+    const selfP = getMealPoint(game, selfId, i)
+    const oppP = getMealPoint(game, oppId, i)
+
+    drawText(`${selfP}:${oppP}`, W - 34, y + 10, 18, '#E94335', 'right', 'bold')
+
+    const bustSelfText = selfBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
+    const bustOppText = oppBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
+    drawText(`${t('you')} ${selfRaw}${bustSelfText}  |  ${t('opponent')} ${oppRaw}${bustOppText}`, 34, y + 38, 11, '#333', 'left', 'bold')
+
+    const cardY = y + 60
+    const colW = (W - 76) / 2
+
+    drawText(t('opponent'), 34, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(oppCards, 34, cardY + 13, colW, blockH - 74, 24)
+
+    drawText(t('you'), 42 + colW, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(selfCards, 42 + colW, cardY + 13, colW, blockH - 74, 24)
+
+    y += blockH + 8
+  }
+
+  if (appMode === 'online') {
+    const ready = game.replayReady || { p1: false, p2: false }
+    const statusText = `${t('nextRound')}：${t('you')} ${ready[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${ready[oppId] ? t('ready') : t('notReady')}`
+
+    drawText(statusText, W / 2, H - SAFE_BOTTOM - 92, 13, '#E94335', 'center', 'bold')
+    addButton(ready[selfId] ? 'noop' : 'replay_ready', ready[selfId] ? t('confirmedWait') : t('nextRound'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+  } else {
+    addButton('restart_home', t('restartHome'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+  }
+}
+
+
+
+// =========================
+// 渲染入口
+// =========================
+
+
+function drawOverlayIfNeeded() {
+  if (Date.now() > startOverlayUntil || !startOverlayText) return
+
+  // v2.6：正式开局后不再显示“开始”遮罩，避免误以为不能操作。
+  if (game && game.phase && game.phase !== 'lobby') return
+
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'
+  ctx.fillRect(0, 0, W, H)
+
+  const boxW = Math.min(W - 60, 280)
+  const boxH = 96
+  const x = (W - boxW) / 2
+  const y = (H - boxH) / 2
+
+  drawRoundRect(x, y, boxW, boxH, 22, '#111', '#111', 2)
+  drawText('开始', x + boxW / 2, y + 18, 30, '#FFE169', 'center', 'bold')
+  drawText(startOverlayText, x + boxW / 2, y + 56, 14, '#fff', 'center', 'bold')
+  ctx.restore()
+}
+
+
+
+function drawTopControls() {
+  // 最后绘制，确保永远在最上层，也保证点击区域最后加入 buttons。
+  drawMusicButton()
+  drawHomeMiniButton()
+}
+
+
+
+
+
+function render() {
+  buttons = []
+  ctx.clearRect(0, 0, W, H)
+  ctx.fillStyle = getPageBg()
+  ctx.fillRect(0, 0, W, H)
+
+  if (appMode === 'home') {
+    drawHome()
+    drawOverlayIfNeeded()
+    drawTopControls()
+    return
+  }
+
+  if (game.phase === 'meal_result') {
+    drawMealResult()
+    drawOverlayIfNeeded()
+    drawTopControls()
+    return
+  }
+
+  if (game.phase === 'day_result') {
+    drawDayResult()
+    drawOverlayIfNeeded()
+    drawTopControls()
+    return
+  }
+
+  drawGameScreen()
+  drawOverlayIfNeeded()
+  drawTopControls()
+}
+
+// =========================
+// 点击事件
+// =========================
+
+
+async function handleAction(id) {
+  const selfId = getSelfId()
+
+  const lockedActions = ['draw_meat', 'draw_veg', 'draw_staple', 'draw_dessert', 'stand', 'reveal_night', 'next', 'replay_ready', 'ready']
+  const shouldLock = appMode === 'online' && lockedActions.includes(id)
+
+  if (shouldLock && onlineActionLocked && Date.now() < onlineActionLockUntil) {
+    return
+  }
+
+  if (shouldLock) {
+    onlineActionLocked = true
+    onlineActionLockUntil = Date.now() + 900
+  }
+
+  pendingActionId = id
+
+  try {
+    if (id === 'rules_toggle') {
+      rulesExpanded = !rulesExpanded
+      if (!rulesExpanded) rulesScroll = 0
+      render()
+      return
+    }
+
+    if (id === 'music_toggle') {
+      toggleBgm()
+      return
+    }
+
+    if (id === 'lang_toggle') {
+      lang = lang === 'zh' ? 'en' : 'zh'
+      localStorage.setItem('lilucard_lang', lang)
+      rulesScroll = 0
+      requestRender()
+      return
+    }
+
+    if (id === 'home') {
+      leaveToHome()
+      return
+    }
+
+    if (id === 'single_start') {
+      appMode = 'single'
+      myPlayerId = 'p1'
+      game = createGame('single')
+      aiOpeningIfNeeded(game)
+      render()
+      return
+    }
+
+    if (id === 'online_create') {
+      await createOnlineRoom()
+      return
+    }
+
+    if (id === 'online_join') {
+      await joinOnlineRoom()
+      return
+    }
+
+    if (id === 'ready') {
+      await playerReady()
+      return
+    }
+
+    if (id === 'draw_meat') applyDraw(game, selfId, '荤')
+    if (id === 'draw_veg') applyDraw(game, selfId, '素')
+    if (id === 'draw_staple') applyDraw(game, selfId, '主食')
+    if (id === 'draw_dessert') applyDraw(game, selfId, '甜点')
+    if (id === 'stand') applyStand(game, selfId)
+    if (id === 'reveal_night') applyRevealNight(game)
+
+    if (['draw_meat', 'draw_veg', 'draw_staple', 'draw_dessert', 'stand', 'reveal_night'].includes(id)) {
+      singleAfterPlayerAction()
+
+      if (appMode === 'online') await saveOnlineGame()
+      else render()
+
+      return
+    }
+
+    if (id === 'next') {
+      applyNext(game, selfId)
+
+      if (appMode === 'online') await saveOnlineGame()
+      else {
+        if (game.phase === 'opening') aiOpeningIfNeeded(game)
+        render()
+      }
+
+      return
+    }
+
+    if (id === 'replay_ready') {
+      applyReplayReady(selfId)
+
+      if (appMode === 'online') await saveOnlineGame()
+      else render()
+
+      return
+    }
+
+    if (id === 'restart_home') {
+      leaveToHome()
+      return
+    }
+  } finally {
+    if (shouldLock) {
+      setTimeout(() => {
+        onlineActionLocked = false
+      }, 360)
+    }
+  }
+}
+
+
+
+
+function onPointer(clientX, clientY) {
+  const id = hitButton(clientX, clientY)
+  if (!id || id === 'noop') return
+
+  if (id === 'music_toggle') {
+    startBgm()
+  }
+
+  retryFailedImages()
+
+  buttonPulse[id] = Date.now()
+  requestRender()
+  setTimeout(requestRender, BUTTON_PULSE_MS + 24)
+
+  handleAction(id)
+}
+
+canvas.addEventListener('touchstart', event => {
+  event.preventDefault()
+
+  const touch = event.touches && event.touches[0]
+  if (!touch) return
+
+  const id = hitButton(touch.clientX, touch.clientY)
+
+  if (id) {
+    onPointer(touch.clientX, touch.clientY)
+    return
+  }
+
+  if (appMode === 'home' && rulesExpanded) {
+    rulesTouchDragging = true
+    rulesTouchLastY = touch.clientY
+  }
+}, { passive: false })
+
+canvas.addEventListener('touchmove', event => {
+  if (!(appMode === 'home' && rulesExpanded && rulesTouchDragging)) return
+
+  event.preventDefault()
+  const touch = event.touches && event.touches[0]
+  if (!touch) return
+
+  const dy = rulesTouchLastY - touch.clientY
+  rulesTouchLastY = touch.clientY
+  rulesScroll = Math.max(0, Math.min(rulesMaxScroll, rulesScroll + dy))
+  requestRender()
+}, { passive: false })
+
+canvas.addEventListener('touchend', event => {
+  rulesTouchDragging = false
+}, { passive: false })
+
+canvas.addEventListener('wheel', event => {
+  if (!(appMode === 'home' && rulesExpanded)) return
+
+  event.preventDefault()
+  rulesScroll = Math.max(0, Math.min(rulesMaxScroll, rulesScroll + event.deltaY))
+  requestRender()
+}, { passive: false })
+
+canvas.addEventListener('mousedown', event => {
+  event.preventDefault()
+  onPointer(event.clientX, event.clientY)
+})
+
+let resizeTimer = null
+
+function scheduleResize(force) {
+  if (resizeTimer) clearTimeout(resizeTimer)
+
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null
+    resizeCanvas(Boolean(force))
+  }, force ? 80 : 140)
+}
+
+window.addEventListener('resize', () => scheduleResize(false))
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => scheduleResize(false))
+  window.visualViewport.addEventListener('scroll', () => scheduleResize(false))
+}
+
+window.addEventListener('orientationchange', () => {
+  scheduleResize(true)
+  setTimeout(() => resizeCanvas(true), 360)
+})
+
+initBgm()
+preloadGameImages()
+render()
