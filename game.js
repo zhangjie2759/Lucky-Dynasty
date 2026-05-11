@@ -251,46 +251,16 @@ const I18N = {
     draw2: '双方可同时抽',
     pickAll: '选完后展示',
     rulesLines: [
-      '胜负目标',
-      '每餐胜利 = 1分。一天共4餐，最终分数高者获胜。',
-
-      '游戏流程',
-      '游戏顺序：早餐 → 午餐 → 晚餐 → 夜宵。',
-      '每餐可以选择：点外卖，或开吃。',
-      '双方都开吃后，自动结算本餐。',
-
-      '爆牌规则',
-      '每餐都有警戒线。',
-      '总热量超过警戒线 = 爆牌。',
-      '爆牌者本餐直接输。',
-      '爆牌这一餐的热量不计入今日总热量。',
-
-      '信息规则',
-      '对方第一张是暗牌。',
-      '后续抽的牌都是明牌。',
-      '对方热量显示为：？ + 明牌热量。',
-
-      '卡牌特性',
-      '每张牌都有不同热量。',
-      '有低热量补分牌，也有高热量风险牌。',
-      '刺客牌看起来安全，但可能让你意外爆牌。',
-
-      '牌型系统',
-      '牌型只在不爆牌时生效。',
-      '中级牌型奖励：加1张荤牌计入今日总热量。',
-      '双拼套餐：任意两类各有至少2张。',
-      '偏科套餐：任意一类至少3张。',
-      '高级牌型奖励：本餐直接加1分。',
-      '满汉大餐：四类齐全，且总牌数至少5张。',
-      '卡线大师：总热量刚好等于警戒线。',
-      '每餐只触发最高级的一个牌型。',
-
-      '夜宵规则',
-      '夜宵会使用剩余所有外卖次数。',
-      '一次性点完，然后统一结算。',
-
-      '一句话总结',
-      '不爆牌，并且比对方更接近警戒线。'
+      '1. 双方准备后开局，早餐 / 午餐 / 晚餐 / 夜宵共 4 小局。',
+      '2. 每局先进入起手阶段，双方各抽 2 张：第 1 张是底牌，第 2 张是明牌；起手不消耗外卖次数。',
+      '3. 早餐起手完成后随机先手；午餐自动换另一方先手；晚餐换回早餐先手方。',
+      '4. 点餐阶段轮流操作。轮到你时，可选择 荤 / 素 / 主食 / 甜点，或点击开吃。',
+      '5. 对方只有底牌未知，其余明牌可见；对方热量显示为「? + 明牌热量」。',
+      '6. 爆牌不会立刻摊牌，你还可以继续点外卖迷惑对方；只有主动开吃才结束。',
+      '7. 双方都开吃后进入本餐结算，公开双方全部外卖、热量、爆牌情况和胜负。',
+      '8. 夜宵不分先后，双方用剩余外卖次数选择搭配；双方选完后点击展示夜宵再结算。',
+      '9. 四局结束后进入今日结算，比分更高者获胜；平局则双方都很会吃。',
+      '10. 联机结束后不会退出房间，双方可继续准备下一整局。'
     ]
   },
   en: {
@@ -368,46 +338,16 @@ const I18N = {
     draw2: 'Draw 2 cards',
     pickAll: 'Pick all',
     rulesLines: [
-      'Goal',
-      'Win a meal to gain 1 point. There are 4 meals. Higher final score wins.',
-
-      'Game Flow',
-      'Meal order: Breakfast → Lunch → Dinner → Night Snack.',
-      'During each meal, choose Order or Eat.',
-      'When both players choose Eat, the meal is settled.',
-
-      'Bust Rule',
-      'Each meal has a calorie limit.',
-      'Going over the limit means Bust.',
-      'If you bust, you lose that meal.',
-      'Calories from a busted meal do not count toward your daily total.',
-
-      'Information',
-      'The rival first card is hidden.',
-      'All later cards are visible.',
-      'Rival calories show as: ? + visible calories.',
-
-      'Card Traits',
-      'Each card has a different calorie value.',
-      'Some cards are low-calorie fillers. Some are high-risk cards.',
-      'Assassin cards may look safe, but can unexpectedly make you bust.',
-
-      'Combo System',
-      'Combos only activate if you do not bust.',
-      'Mid combo reward: add 1 Meat card to your daily total.',
-      'Double Combo: any two categories have at least 2 cards each.',
-      'One-Type Combo: any one category has at least 3 cards.',
-      'High combo reward: gain 1 extra point for this meal.',
-      'Full Feast: all 4 categories appear, with at least 5 total cards.',
-      'Limit Master: your calories exactly equal the limit.',
-      'Only the highest combo can trigger each meal.',
-
-      'Night Snack',
-      'Night Snack uses all remaining order chances.',
-      'Choose all at once, then reveal and settle.',
-
-      'Summary',
-      'Do not bust. Get closer to the limit than your rival.'
+      '1. Play 4 meals: Breakfast, Lunch, Dinner, and Night Snack.',
+      '2. Each meal starts with 2 cards: first hidden, second visible. Opening cards do not cost orders.',
+      '3. Breakfast first player is random. Lunch switches first player. Dinner switches back.',
+      '4. On your turn, choose Meat / Veg / Staple / Dessert, or tap Eat.',
+      '5. Only the rival hidden card is unknown. Visible calories show as “? + visible calories”.',
+      '6. Busting does not reveal immediately. You may keep ordering to bluff. Only Eat ends your meal.',
+      '7. When both players Eat, all cards, calories, busts, and the winner are revealed.',
+      '8. Night Snack is simultaneous. Spend remaining orders, then tap Reveal to settle.',
+      '9. After 4 meals, the higher score wins the day.',
+      '10. Online rooms stay open, so both players can ready up for another round.'
     ]
   }
 }
@@ -2762,32 +2702,35 @@ function drawActionButtons() {
 
 
 
-
 function drawGameScreen() {
+  drawTopBadge()
+
+  const isOnline = appMode === 'online'
+  const topY = SAFE_TOP + (isOnline ? 34 : 4)
+  const actionY = H - SAFE_BOTTOM - 94
+  const gap = H < 700 ? 5 : 8
+  const centerH = H < 680 ? 66 : H < 760 ? 74 : 86
+
+  const available = Math.max(300, actionY - topY - centerH - gap * 2 - 8)
+  let zoneH = Math.floor(available / 2)
+
+  // 全机型自适应：小屏时宁可压缩卡牌区，也不要压扁底部按钮。
+  const minZone = H < 680 ? 116 : H < 760 ? 132 : 150
+  const maxZone = H > 850 ? 248 : 220
+  zoneH = Math.max(minZone, Math.min(maxZone, zoneH))
+
   const ids = getDisplayPlayerIds()
-  const centerH = H < 720 ? 70 : 80
-  const gap = H < 720 ? 6 : 8
-  const actionH = 92
-
-  const topY = SAFE_TOP + 34
-
-  const availableH = H - topY - actionH - SAFE_BOTTOM - 12
-  const panelH = Math.max(130, Math.floor((availableH - centerH - gap * 2) / 2))
-
-  const oppY = topY
-  const centerY = oppY + panelH + gap
+  const opponentY = topY
+  const centerY = opponentY + zoneH + gap
   const selfY = centerY + centerH + gap
 
-  drawPlayerPanel(ids.opponent, t('opponent'), 16, oppY, W - 32, panelH, true)
+  drawPlayerPanel(ids.opponent, t('opponent'), 16, opponentY, W - 32, zoneH, true)
   drawCenterPanel(16, centerY, W - 32, centerH)
-  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, panelH, false)
+  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, zoneH, false)
 
-  drawWaitingOpponentFloat()
   drawActionButtons()
+  drawWaitingOpponentFloat()
 }
-
-
-
 
 
 
