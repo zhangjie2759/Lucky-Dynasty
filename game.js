@@ -1,5 +1,5 @@
 // game.js
-// 利禄卡 Online v4.4 干净重建中英文版
+// 利禄卡 Online v4.8 稳定回退+新版规则
 // 状态机：lobby / opening / meal_playing / meal_result / night_picking / day_result
 
 const IS_WEB = typeof window !== 'undefined' && typeof document !== 'undefined'
@@ -251,16 +251,46 @@ const I18N = {
     draw2: '双方可同时抽',
     pickAll: '选完后展示',
     rulesLines: [
-      '1. 双方准备后开局，早餐 / 午餐 / 晚餐 / 夜宵共 4 小局。',
-      '2. 每局先进入起手阶段，双方各抽 2 张：第 1 张是底牌，第 2 张是明牌；起手不消耗外卖次数。',
-      '3. 早餐起手完成后随机先手；午餐自动换另一方先手；晚餐换回早餐先手方。',
-      '4. 点餐阶段轮流操作。轮到你时，可选择 荤 / 素 / 主食 / 甜点，或点击开吃。',
-      '5. 对方只有底牌未知，其余明牌可见；对方热量显示为「? + 明牌热量」。',
-      '6. 爆牌不会立刻摊牌，你还可以继续点外卖迷惑对方；只有主动开吃才结束。',
-      '7. 双方都开吃后进入本餐结算，公开双方全部外卖、热量、爆牌情况和胜负。',
-      '8. 夜宵不分先后，双方用剩余外卖次数选择搭配；双方选完后点击展示夜宵再结算。',
-      '9. 四局结束后进入今日结算，比分更高者获胜；平局则双方都很会吃。',
-      '10. 联机结束后不会退出房间，双方可继续准备下一整局。'
+      '🎯 胜负目标',
+      '每餐胜利 = 1分。一天共 4 餐，最终分数高者获胜。',
+
+      '🔁 游戏流程',
+      '游戏分为：早餐 → 午餐 → 晚餐 → 夜宵。',
+      '每餐你可以重复选择：点外卖，或开吃。',
+      '当双方都开吃后，自动结算本餐胜负。',
+
+      '⚠️ 爆牌规则',
+      '每餐都有一个警戒线。',
+      '总热量超过警戒线 = 爆牌。',
+      '爆牌者本餐直接输。',
+      '爆牌这一餐的热量不会计入今日总热量。',
+
+      '👀 信息规则',
+      '对方第一张是暗牌。',
+      '后续抽的都是明牌。',
+      '对方热量显示为：？ + 明牌热量。',
+
+      '🧠 卡牌特性',
+      '每张牌都有不同热量。',
+      '有低热量补分牌，也有高热量风险牌。',
+      '刺客牌看起来安全，但容易让你意外爆牌。',
+
+      '🧩 牌型系统',
+      '牌型仅在不爆牌时生效。',
+      '中级牌型奖励：+1张荤牌计入今日总热量。',
+      '双拼套餐：任意两类 ≥2张。',
+      '偏科套餐：任意一类 ≥3张。',
+      '高级牌型奖励：本餐直接+1分。',
+      '满汉大餐：四类齐全且 ≥5张。',
+      '卡线大师：总热量刚好等于警戒线。',
+      '每餐只触发最高级一个牌型。',
+
+      '🌙 夜宵规则',
+      '夜宵会使用剩余所有外卖次数。',
+      '一次性点完，然后统一结算。',
+
+      '✅ 一句话总结',
+      '在不爆的前提下，比对方更接近极限。'
     ]
   },
   en: {
@@ -338,16 +368,46 @@ const I18N = {
     draw2: 'Draw 2 cards',
     pickAll: 'Pick all',
     rulesLines: [
-      '1. Play 4 meals: Breakfast, Lunch, Dinner, and Night Snack.',
-      '2. Each meal starts with 2 cards: first hidden, second visible. Opening cards do not cost orders.',
-      '3. Breakfast first player is random. Lunch switches first player. Dinner switches back.',
-      '4. On your turn, choose Meat / Veg / Staple / Dessert, or tap Eat.',
-      '5. Only the rival hidden card is unknown. Visible calories show as “? + visible calories”.',
-      '6. Busting does not reveal immediately. You may keep ordering to bluff. Only Eat ends your meal.',
-      '7. When both players Eat, all cards, calories, busts, and the winner are revealed.',
-      '8. Night Snack is simultaneous. Spend remaining orders, then tap Reveal to settle.',
-      '9. After 4 meals, the higher score wins the day.',
-      '10. Online rooms stay open, so both players can ready up for another round.'
+      '🎯 Goal',
+      'Winning a meal gives 1 point. There are 4 meals in a day. Higher final score wins.',
+
+      '🔁 Game Flow',
+      'The day has 4 meals: Breakfast → Lunch → Dinner → Night Snack.',
+      'During each meal, you may keep ordering cards or choose Eat to stop.',
+      'When both players choose Eat, the meal is settled automatically.',
+
+      '⚠️ Bust Rule',
+      'Each meal has a calorie limit.',
+      'Going over the limit means Bust.',
+      'If you bust, you lose that meal immediately.',
+      'Calories from a busted meal do not count toward your daily total.',
+
+      '👀 Information',
+      'The rival’s first card is hidden.',
+      'All later cards are visible.',
+      'The rival’s calories show as: ? + visible calories.',
+
+      '🧠 Card Traits',
+      'Each card has a different calorie value.',
+      'Some cards are low-calorie fillers, while others are high-risk cards.',
+      'Assassin cards may look safe, but can unexpectedly make you bust.',
+
+      '🧩 Combo System',
+      'Combos only activate if you do not bust.',
+      'Mid combo reward: +1 Meat card added to your daily total.',
+      'Double Combo: any two categories have at least 2 cards each.',
+      'One-Type Combo: any one category has at least 3 cards.',
+      'High combo reward: +1 point for this meal.',
+      'Full Feast: all 4 categories appear and you have at least 5 cards.',
+      'Limit Master: your calories exactly equal the limit.',
+      'Only the highest combo can trigger each meal.',
+
+      '🌙 Night Snack',
+      'Night Snack uses all remaining order chances.',
+      'Choose them all at once, then reveal and settle.',
+
+      '✅ Summary',
+      'Do not bust. Get closer to the limit than your rival.'
     ]
   }
 }
@@ -2139,18 +2199,12 @@ function drawTinyCards(cards, x, y, areaW, areaH, maxSize) {
   }
 }
 
-
 function drawCompactMealCards(title, cards, total, busted, x, y, w, h) {
   drawRoundRect(x, y, w, h, 16, '#FFFFFF', '#111', 2.2)
   drawText(title, x + 12, y + 10, 15, '#111', 'left', 'bold')
-
-  const bustedText = busted ? (lang === 'en' ? ' Bust' : ' 爆') : ''
-  drawText(`${total} ${t('kcal')}${bustedText}`, x + w - 12, y + 11, 13, busted ? '#E94335' : '#111', 'right', 'bold')
-
+  drawText(`${total} kcal${busted ? ' 爆' : ''}`, x + w - 12, y + 11, 13, busted ? '#E94335' : '#111', 'right', 'bold')
   drawTinyCards(cards, x + 12, y + 34, w - 24, h - 42, 34)
 }
-
-
 
 
 // =========================
@@ -2772,28 +2826,27 @@ function drawWaitingOpponentFloat() {
 
 
 
-
 function drawMealResult() {
   const result = game.lastMealResult
 
   if (!result) {
-    drawText(t('result'), 24, SAFE_TOP + 10, 28, '#111', 'left', 'bold')
-    addButton('next', lang === 'en' ? 'Continue' : '继续', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    drawText('本餐结算', 24, SAFE_TOP + 10, 28, '#111', 'left', 'bold')
+        addButton('next', '继续', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
     return
   }
 
   const selfId = getSelfId()
   const oppId = otherPlayer(selfId)
 
-  let verdict = t('mealDraw')
-  let quote = t('quoteDraw')
+  let verdict = '本餐平局'
+  let quote = '你俩都挺能装。'
 
   if (result.winner === selfId) {
-    verdict = t('youWonMeal')
-    quote = t('quoteWin')
+    verdict = '本餐你赢了'
+    quote = '你很会吃啊，小朋友。'
   } else if (result.winner === oppId) {
-    verdict = t('youLostMeal')
-    quote = t('quoteLose')
+    verdict = '本餐你输了'
+    quote = '你会吃有个屁用。'
   }
 
   const selfScore = getMealTotalPoint(game, selfId)
@@ -2801,11 +2854,11 @@ function drawMealResult() {
 
   const selfCards = getMealCardsFromResult(result, selfId)
   const oppCards = getMealCardsFromResult(result, oppId)
-
   const selfTotal = selfId === 'p1' ? result.p1Total : result.p2Total
   const oppTotal = oppId === 'p1' ? result.p1Total : result.p2Total
   const selfBusted = selfId === 'p1' ? result.p1Busted : result.p2Busted
   const oppBusted = oppId === 'p1' ? result.p1Busted : result.p2Busted
+
 
   const panelW = W - 48
   const panelH = Math.min(520, H - SAFE_TOP - SAFE_BOTTOM - 112)
@@ -2814,40 +2867,34 @@ function drawMealResult() {
 
   drawRoundRect(x, y, panelW, panelH, 28, '#FFFFFF', '#111', 4)
 
-  drawText(`${mealName(result.mealIndex)} ${t('result')}`, W / 2, y + 24, 24, '#111', 'center', 'bold')
-  drawText(verdict, W / 2, y + 62, lang === 'en' ? 28 : 34, result.winner === selfId ? '#E94335' : '#111', 'center', 'bold')
-  drawText(quote, W / 2, y + 108, lang === 'en' ? 14 : 16, '#555', 'center', 'bold')
+  drawText(`${result.mealName}结算`, W / 2, y + 24, 24, '#111', 'center', 'bold')
+  drawText(verdict, W / 2, y + 62, 34, result.winner === selfId ? '#E94335' : '#111', 'center', 'bold')
+  drawText(quote, W / 2, y + 108, 16, '#555', 'center', 'bold')
 
-  drawRoundRect(W / 2 - 96, y + 138, 192, 44, 22, '#FFF6E8', '#111', 3)
-  drawText(`${t('you')} ${selfScore} : ${oppScore} ${t('opponent')}`, W / 2, y + 150, lang === 'en' ? 17 : 22, '#111', 'center', 'bold')
+  drawRoundRect(W / 2 - 86, y + 138, 172, 44, 22, '#FFF6E8', '#111', 3)
+  drawText(`你 ${selfScore} : ${oppScore} 对手`, W / 2, y + 150, 22, '#111', 'center', 'bold')
 
   const cardAreaY = y + 202
   const cardPanelH = Math.max(108, Math.min(150, (panelH - 260) / 2))
-
-  drawCompactMealCards(t('rivalOrders'), oppCards, oppTotal, oppBusted, x + 16, cardAreaY, panelW - 32, cardPanelH)
-  drawCompactMealCards(t('yourOrders'), selfCards, selfTotal, selfBusted, x + 16, cardAreaY + cardPanelH + 10, panelW - 32, cardPanelH)
+  drawCompactMealCards('对方外卖', oppCards, oppTotal, oppBusted, x + 16, cardAreaY, panelW - 32, cardPanelH)
+  drawCompactMealCards('你的外卖', selfCards, selfTotal, selfBusted, x + 16, cardAreaY + cardPanelH + 10, panelW - 32, cardPanelH)
 
   if (appMode === 'online') {
     const nextReady = game.nextReady || { p1: false, p2: false }
-    const statusText = lang === 'en'
-      ? `Confirm: ${t('you')} ${nextReady[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${nextReady[oppId] ? t('ready') : t('notReady')}`
-      : `确认状态：${t('you')} ${nextReady[selfId] ? '已确认' : '未确认'}｜${t('opponent')} ${nextReady[oppId] ? '已确认' : '未确认'}`
-
+    const statusText = `确认状态：你 ${nextReady[selfId] ? '已确认' : '未确认'}｜对方 ${nextReady[oppId] ? '已确认' : '未确认'}`
     drawText(statusText, W / 2, y + panelH - 30, 12, '#E94335', 'center', 'bold')
   }
 
   const nextReady = game.nextReady || { p1: false, p2: false }
-  const nextName = game.mealIndex >= 3 ? t('finalResult') : mealName(game.mealIndex + 1)
+  const nextName = game.mealIndex >= 3 ? '今日结算' : meals[game.mealIndex + 1].name
 
   if (appMode === 'online') {
     const alreadyReady = Boolean(nextReady[selfId])
-    addButton(alreadyReady ? 'noop' : 'next', alreadyReady ? t('confirmedWait') : `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 17 : 19)
+    addButton(alreadyReady ? 'noop' : 'next', alreadyReady ? `已确认，等待对方` : `确认进入${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 19)
   } else {
-    addButton('next', `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 18 : 22)
+    addButton('next', `进入${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   }
 }
-
-
 
 function drawResultPlayer(title, pid, y, h) {
   const result = game.lastMealResult
@@ -2872,8 +2919,6 @@ function drawResultPlayer(title, pid, y, h) {
 
 
 
-
-
 function drawDayResult() {
   const selfId = getSelfId()
   const oppId = otherPlayer(selfId)
@@ -2882,15 +2927,15 @@ function drawDayResult() {
   const selfKcal = getDayTotalKcal(game, selfId)
   const oppKcal = getDayTotalKcal(game, oppId)
 
-  let finalText = t('finalDraw')
-  let finalSubText = t('finalDrawSub')
+  let finalText = '平局'
+  let finalSubText = '双方今天吃得不相上下'
 
   if (selfPoint > oppPoint) {
-    finalText = t('finalWin')
-    finalSubText = t('finalWinSub')
+    finalText = '恭喜你赢了！'
+    finalSubText = '你赢得了这一整局'
   } else if (selfPoint < oppPoint) {
-    finalText = t('finalLose')
-    finalSubText = t('finalLoseSub')
+    finalText = '你输了'
+    finalSubText = '对方赢得了这一整局'
   }
 
   const selfWin = selfPoint > oppPoint
@@ -2898,31 +2943,30 @@ function drawDayResult() {
   const selfColor = selfWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
   const oppColor = oppWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
 
-  const topY = SAFE_TOP + 42
-  const topH = lang === 'en' ? 140 : 126
+  drawRoundRect(20, SAFE_TOP + 42, W - 40, 126, 22, '#FFFFFF', '#111', 3)
+  drawText(finalText, W / 2, SAFE_TOP + 56, 27, selfWin ? '#E94335' : '#111', 'center', 'bold')
+  drawText(finalSubText, W / 2, SAFE_TOP + 90, 13, '#555', 'center', 'bold')
 
-  drawRoundRect(20, topY, W - 40, topH, 22, '#FFFFFF', '#111', 3)
-  drawText(finalText, W / 2, topY + 22, lang === 'en' ? 30 : 27, selfWin ? '#E94335' : '#111', 'center', 'bold')
-  drawText(finalSubText, W / 2, topY + 60, 13, '#555', 'center', 'bold')
-
-  drawText(`${t('you')} ${selfPoint} : ${oppPoint} ${t('opponent')}`, W / 2, topY + 88, lang === 'en' ? 20 : 22, '#111', 'center', 'bold')
-  drawText(`${selfKcal} ${t('kcal')}`, W * 0.28, topY + 114, 16, selfColor, 'center', 'bold')
-  drawText(`${oppKcal} ${t('kcal')}`, W * 0.72, topY + 114, 16, oppColor, 'center', 'bold')
+  // v3.6：最终几比几两边显示双方最终卡路里。
+  drawText(`${selfKcal} kcal`, W * 0.24, SAFE_TOP + 120, 18, selfColor, 'center', 'bold')
+  drawText(`你 ${selfPoint} : ${oppPoint} 对手`, W / 2, SAFE_TOP + 116, 22, '#111', 'center', 'bold')
+  drawText(`${oppKcal} kcal`, W * 0.76, SAFE_TOP + 120, 18, oppColor, 'center', 'bold')
 
   const results = safeArray(game.mealResults)
-  let y = topY + topH + 20
+  let y = SAFE_TOP + 184
   const bottomLimit = H - SAFE_BOTTOM - 104
-  const blockH = Math.max(92, Math.min(116, (bottomLimit - y - 18) / meals.length))
+  const blockH = Math.max(82, Math.min(112, (bottomLimit - y - 18) / meals.length))
 
   for (let i = 0; i < meals.length; i++) {
+    const meal = meals[i]
     const res = results[i]
 
     drawRoundRect(20, y, W - 40, blockH, 16, '#FFFFFF', '#111', 2)
 
-    drawText(mealName(i), 34, y + 10, lang === 'en' ? 20 : 16, '#111', 'left', 'bold')
+    drawText(meal.name, 34, y + 10, 17, '#111', 'left', 'bold')
 
     if (!res) {
-      drawText(t('noRecord'), W / 2, y + 42, 13, '#777', 'center', 'bold')
+      drawText('无记录', W / 2, y + 12, 13, '#777', 'center', 'bold')
       y += blockH + 8
       continue
     }
@@ -2936,38 +2980,28 @@ function drawDayResult() {
     const selfP = getMealPoint(game, selfId, i)
     const oppP = getMealPoint(game, oppId, i)
 
-    drawText(`${selfP}:${oppP}`, W - 34, y + 10, 18, '#E94335', 'right', 'bold')
+    drawText(`${selfP}:${oppP}`, W - 34, y + 10, 16, '#E94335', 'right', 'bold')
+    drawText(`你 ${selfRaw}${selfBusted ? '爆' : ''}｜对手 ${oppRaw}${oppBusted ? '爆' : ''}`, 92, y + 12, 12, '#333', 'left', 'bold')
 
-    const bustSelfText = selfBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
-    const bustOppText = oppBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
-    drawText(`${t('you')} ${selfRaw}${bustSelfText}  |  ${t('opponent')} ${oppRaw}${bustOppText}`, 34, y + 38, 11, '#333', 'left', 'bold')
-
-    const cardY = y + 60
+    const cardY = y + 34
     const colW = (W - 76) / 2
-
-    drawText(t('opponent'), 34, cardY, 10, '#777', 'left', 'bold')
-    drawTinyCards(oppCards, 34, cardY + 13, colW, blockH - 74, 24)
-
-    drawText(t('you'), 42 + colW, cardY, 10, '#777', 'left', 'bold')
-    drawTinyCards(selfCards, 42 + colW, cardY + 13, colW, blockH - 74, 24)
+    drawText('对方', 34, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(oppCards, 34, cardY + 14, colW, blockH - 50, 26)
+    drawText('你', 42 + colW, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(selfCards, 42 + colW, cardY + 14, colW, blockH - 50, 26)
 
     y += blockH + 8
   }
 
   if (appMode === 'online') {
     const ready = game.replayReady || { p1: false, p2: false }
-    const statusText = `${t('nextRound')}：${t('you')} ${ready[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${ready[oppId] ? t('ready') : t('notReady')}`
-
+    const statusText = `下一整局准备：你 ${ready[selfId] ? '已准备' : '未准备'}｜对方 ${ready[oppId] ? '已准备' : '未准备'}`
     drawText(statusText, W / 2, H - SAFE_BOTTOM - 92, 13, '#E94335', 'center', 'bold')
-    addButton(ready[selfId] ? 'noop' : 'replay_ready', ready[selfId] ? t('confirmedWait') : t('nextRound'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    addButton(ready[selfId] ? 'noop' : 'replay_ready', ready[selfId] ? '已准备，等待对方' : '准备下一局', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   } else {
-    addButton('restart_home', t('restartHome'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    addButton('restart_home', '返回首页', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   }
 }
-
-
-
-
 
 // =========================
 // 渲染入口
