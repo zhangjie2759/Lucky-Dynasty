@@ -2139,18 +2139,12 @@ function drawTinyCards(cards, x, y, areaW, areaH, maxSize) {
   }
 }
 
-
 function drawCompactMealCards(title, cards, total, busted, x, y, w, h) {
   drawRoundRect(x, y, w, h, 16, '#FFFFFF', '#111', 2.2)
   drawText(title, x + 12, y + 10, 15, '#111', 'left', 'bold')
-
-  const bustedText = busted ? (lang === 'en' ? ' Bust' : ' 爆') : ''
-  drawText(`${total} ${t('kcal')}${bustedText}`, x + w - 12, y + 11, 13, busted ? '#E94335' : '#111', 'right', 'bold')
-
+  drawText(`${total} kcal${busted ? ' 爆' : ''}`, x + w - 12, y + 11, 13, busted ? '#E94335' : '#111', 'right', 'bold')
   drawTinyCards(cards, x + 12, y + 34, w - 24, h - 42, 34)
 }
-
-
 
 
 // =========================
@@ -2772,28 +2766,27 @@ function drawWaitingOpponentFloat() {
 
 
 
-
 function drawMealResult() {
   const result = game.lastMealResult
 
   if (!result) {
-    drawText(t('result'), 24, SAFE_TOP + 10, 28, '#111', 'left', 'bold')
-    addButton('next', lang === 'en' ? 'Continue' : '继续', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    drawText('本餐结算', 24, SAFE_TOP + 10, 28, '#111', 'left', 'bold')
+        addButton('next', '继续', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
     return
   }
 
   const selfId = getSelfId()
   const oppId = otherPlayer(selfId)
 
-  let verdict = t('mealDraw')
-  let quote = t('quoteDraw')
+  let verdict = '本餐平局'
+  let quote = '你俩都挺能装。'
 
   if (result.winner === selfId) {
-    verdict = t('youWonMeal')
-    quote = t('quoteWin')
+    verdict = '本餐你赢了'
+    quote = '你很会吃啊，小朋友。'
   } else if (result.winner === oppId) {
-    verdict = t('youLostMeal')
-    quote = t('quoteLose')
+    verdict = '本餐你输了'
+    quote = '你会吃有个屁用。'
   }
 
   const selfScore = getMealTotalPoint(game, selfId)
@@ -2801,11 +2794,11 @@ function drawMealResult() {
 
   const selfCards = getMealCardsFromResult(result, selfId)
   const oppCards = getMealCardsFromResult(result, oppId)
-
   const selfTotal = selfId === 'p1' ? result.p1Total : result.p2Total
   const oppTotal = oppId === 'p1' ? result.p1Total : result.p2Total
   const selfBusted = selfId === 'p1' ? result.p1Busted : result.p2Busted
   const oppBusted = oppId === 'p1' ? result.p1Busted : result.p2Busted
+
 
   const panelW = W - 48
   const panelH = Math.min(520, H - SAFE_TOP - SAFE_BOTTOM - 112)
@@ -2814,40 +2807,34 @@ function drawMealResult() {
 
   drawRoundRect(x, y, panelW, panelH, 28, '#FFFFFF', '#111', 4)
 
-  drawText(`${mealName(result.mealIndex)} ${t('result')}`, W / 2, y + 24, 24, '#111', 'center', 'bold')
-  drawText(verdict, W / 2, y + 62, lang === 'en' ? 28 : 34, result.winner === selfId ? '#E94335' : '#111', 'center', 'bold')
-  drawText(quote, W / 2, y + 108, lang === 'en' ? 14 : 16, '#555', 'center', 'bold')
+  drawText(`${result.mealName}结算`, W / 2, y + 24, 24, '#111', 'center', 'bold')
+  drawText(verdict, W / 2, y + 62, 34, result.winner === selfId ? '#E94335' : '#111', 'center', 'bold')
+  drawText(quote, W / 2, y + 108, 16, '#555', 'center', 'bold')
 
-  drawRoundRect(W / 2 - 96, y + 138, 192, 44, 22, '#FFF6E8', '#111', 3)
-  drawText(`${t('you')} ${selfScore} : ${oppScore} ${t('opponent')}`, W / 2, y + 150, lang === 'en' ? 17 : 22, '#111', 'center', 'bold')
+  drawRoundRect(W / 2 - 86, y + 138, 172, 44, 22, '#FFF6E8', '#111', 3)
+  drawText(`你 ${selfScore} : ${oppScore} 对手`, W / 2, y + 150, 22, '#111', 'center', 'bold')
 
   const cardAreaY = y + 202
   const cardPanelH = Math.max(108, Math.min(150, (panelH - 260) / 2))
-
-  drawCompactMealCards(t('rivalOrders'), oppCards, oppTotal, oppBusted, x + 16, cardAreaY, panelW - 32, cardPanelH)
-  drawCompactMealCards(t('yourOrders'), selfCards, selfTotal, selfBusted, x + 16, cardAreaY + cardPanelH + 10, panelW - 32, cardPanelH)
+  drawCompactMealCards('对方外卖', oppCards, oppTotal, oppBusted, x + 16, cardAreaY, panelW - 32, cardPanelH)
+  drawCompactMealCards('你的外卖', selfCards, selfTotal, selfBusted, x + 16, cardAreaY + cardPanelH + 10, panelW - 32, cardPanelH)
 
   if (appMode === 'online') {
     const nextReady = game.nextReady || { p1: false, p2: false }
-    const statusText = lang === 'en'
-      ? `Confirm: ${t('you')} ${nextReady[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${nextReady[oppId] ? t('ready') : t('notReady')}`
-      : `确认状态：${t('you')} ${nextReady[selfId] ? '已确认' : '未确认'}｜${t('opponent')} ${nextReady[oppId] ? '已确认' : '未确认'}`
-
+    const statusText = `确认状态：你 ${nextReady[selfId] ? '已确认' : '未确认'}｜对方 ${nextReady[oppId] ? '已确认' : '未确认'}`
     drawText(statusText, W / 2, y + panelH - 30, 12, '#E94335', 'center', 'bold')
   }
 
   const nextReady = game.nextReady || { p1: false, p2: false }
-  const nextName = game.mealIndex >= 3 ? t('finalResult') : mealName(game.mealIndex + 1)
+  const nextName = game.mealIndex >= 3 ? '今日结算' : meals[game.mealIndex + 1].name
 
   if (appMode === 'online') {
     const alreadyReady = Boolean(nextReady[selfId])
-    addButton(alreadyReady ? 'noop' : 'next', alreadyReady ? t('confirmedWait') : `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 17 : 19)
+    addButton(alreadyReady ? 'noop' : 'next', alreadyReady ? `已确认，等待对方` : `确认进入${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 19)
   } else {
-    addButton('next', `${t('confirmGo')}${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', lang === 'en' ? 18 : 22)
+    addButton('next', `进入${nextName}`, 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   }
 }
-
-
 
 function drawResultPlayer(title, pid, y, h) {
   const result = game.lastMealResult
@@ -2872,8 +2859,6 @@ function drawResultPlayer(title, pid, y, h) {
 
 
 
-
-
 function drawDayResult() {
   const selfId = getSelfId()
   const oppId = otherPlayer(selfId)
@@ -2882,15 +2867,15 @@ function drawDayResult() {
   const selfKcal = getDayTotalKcal(game, selfId)
   const oppKcal = getDayTotalKcal(game, oppId)
 
-  let finalText = t('finalDraw')
-  let finalSubText = t('finalDrawSub')
+  let finalText = '平局'
+  let finalSubText = '双方今天吃得不相上下'
 
   if (selfPoint > oppPoint) {
-    finalText = t('finalWin')
-    finalSubText = t('finalWinSub')
+    finalText = '恭喜你赢了！'
+    finalSubText = '你赢得了这一整局'
   } else if (selfPoint < oppPoint) {
-    finalText = t('finalLose')
-    finalSubText = t('finalLoseSub')
+    finalText = '你输了'
+    finalSubText = '对方赢得了这一整局'
   }
 
   const selfWin = selfPoint > oppPoint
@@ -2898,31 +2883,30 @@ function drawDayResult() {
   const selfColor = selfWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
   const oppColor = oppWin ? '#E94335' : selfPoint === oppPoint ? '#E94335' : '#888'
 
-  const topY = SAFE_TOP + 42
-  const topH = lang === 'en' ? 140 : 126
+  drawRoundRect(20, SAFE_TOP + 42, W - 40, 126, 22, '#FFFFFF', '#111', 3)
+  drawText(finalText, W / 2, SAFE_TOP + 56, 27, selfWin ? '#E94335' : '#111', 'center', 'bold')
+  drawText(finalSubText, W / 2, SAFE_TOP + 90, 13, '#555', 'center', 'bold')
 
-  drawRoundRect(20, topY, W - 40, topH, 22, '#FFFFFF', '#111', 3)
-  drawText(finalText, W / 2, topY + 22, lang === 'en' ? 30 : 27, selfWin ? '#E94335' : '#111', 'center', 'bold')
-  drawText(finalSubText, W / 2, topY + 60, 13, '#555', 'center', 'bold')
-
-  drawText(`${t('you')} ${selfPoint} : ${oppPoint} ${t('opponent')}`, W / 2, topY + 88, lang === 'en' ? 20 : 22, '#111', 'center', 'bold')
-  drawText(`${selfKcal} ${t('kcal')}`, W * 0.28, topY + 114, 16, selfColor, 'center', 'bold')
-  drawText(`${oppKcal} ${t('kcal')}`, W * 0.72, topY + 114, 16, oppColor, 'center', 'bold')
+  // v3.6：最终几比几两边显示双方最终卡路里。
+  drawText(`${selfKcal} kcal`, W * 0.24, SAFE_TOP + 120, 18, selfColor, 'center', 'bold')
+  drawText(`你 ${selfPoint} : ${oppPoint} 对手`, W / 2, SAFE_TOP + 116, 22, '#111', 'center', 'bold')
+  drawText(`${oppKcal} kcal`, W * 0.76, SAFE_TOP + 120, 18, oppColor, 'center', 'bold')
 
   const results = safeArray(game.mealResults)
-  let y = topY + topH + 20
+  let y = SAFE_TOP + 184
   const bottomLimit = H - SAFE_BOTTOM - 104
-  const blockH = Math.max(92, Math.min(116, (bottomLimit - y - 18) / meals.length))
+  const blockH = Math.max(82, Math.min(112, (bottomLimit - y - 18) / meals.length))
 
   for (let i = 0; i < meals.length; i++) {
+    const meal = meals[i]
     const res = results[i]
 
     drawRoundRect(20, y, W - 40, blockH, 16, '#FFFFFF', '#111', 2)
 
-    drawText(mealName(i), 34, y + 10, lang === 'en' ? 20 : 16, '#111', 'left', 'bold')
+    drawText(meal.name, 34, y + 10, 17, '#111', 'left', 'bold')
 
     if (!res) {
-      drawText(t('noRecord'), W / 2, y + 42, 13, '#777', 'center', 'bold')
+      drawText('无记录', W / 2, y + 12, 13, '#777', 'center', 'bold')
       y += blockH + 8
       continue
     }
@@ -2936,38 +2920,28 @@ function drawDayResult() {
     const selfP = getMealPoint(game, selfId, i)
     const oppP = getMealPoint(game, oppId, i)
 
-    drawText(`${selfP}:${oppP}`, W - 34, y + 10, 18, '#E94335', 'right', 'bold')
+    drawText(`${selfP}:${oppP}`, W - 34, y + 10, 16, '#E94335', 'right', 'bold')
+    drawText(`你 ${selfRaw}${selfBusted ? '爆' : ''}｜对手 ${oppRaw}${oppBusted ? '爆' : ''}`, 92, y + 12, 12, '#333', 'left', 'bold')
 
-    const bustSelfText = selfBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
-    const bustOppText = oppBusted ? (lang === 'en' ? ' Bust' : '爆') : ''
-    drawText(`${t('you')} ${selfRaw}${bustSelfText}  |  ${t('opponent')} ${oppRaw}${bustOppText}`, 34, y + 38, 11, '#333', 'left', 'bold')
-
-    const cardY = y + 60
+    const cardY = y + 34
     const colW = (W - 76) / 2
-
-    drawText(t('opponent'), 34, cardY, 10, '#777', 'left', 'bold')
-    drawTinyCards(oppCards, 34, cardY + 13, colW, blockH - 74, 24)
-
-    drawText(t('you'), 42 + colW, cardY, 10, '#777', 'left', 'bold')
-    drawTinyCards(selfCards, 42 + colW, cardY + 13, colW, blockH - 74, 24)
+    drawText('对方', 34, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(oppCards, 34, cardY + 14, colW, blockH - 50, 26)
+    drawText('你', 42 + colW, cardY, 10, '#777', 'left', 'bold')
+    drawTinyCards(selfCards, 42 + colW, cardY + 14, colW, blockH - 50, 26)
 
     y += blockH + 8
   }
 
   if (appMode === 'online') {
     const ready = game.replayReady || { p1: false, p2: false }
-    const statusText = `${t('nextRound')}：${t('you')} ${ready[selfId] ? t('ready') : t('notReady')}｜${t('opponent')} ${ready[oppId] ? t('ready') : t('notReady')}`
-
+    const statusText = `下一整局准备：你 ${ready[selfId] ? '已准备' : '未准备'}｜对方 ${ready[oppId] ? '已准备' : '未准备'}`
     drawText(statusText, W / 2, H - SAFE_BOTTOM - 92, 13, '#E94335', 'center', 'bold')
-    addButton(ready[selfId] ? 'noop' : 'replay_ready', ready[selfId] ? t('confirmedWait') : t('nextRound'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    addButton(ready[selfId] ? 'noop' : 'replay_ready', ready[selfId] ? '已准备，等待对方' : '准备下一局', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   } else {
-    addButton('restart_home', t('restartHome'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
+    addButton('restart_home', '返回首页', 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   }
 }
-
-
-
-
 
 // =========================
 // 渲染入口
