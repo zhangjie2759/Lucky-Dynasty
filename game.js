@@ -251,46 +251,46 @@ const I18N = {
     draw2: '双方可同时抽',
     pickAll: '选完后展示',
     rulesLines: [
-      '🎯 胜负目标',
-      '每餐胜利 = 1分。一天共 4 餐，最终分数高者获胜。',
+      '胜负目标',
+      '每餐胜利 = 1分。一天共4餐，最终分数高者获胜。',
 
-      '🔁 游戏流程',
-      '游戏分为：早餐 → 午餐 → 晚餐 → 夜宵。',
-      '每餐你可以重复选择：点外卖，或开吃。',
-      '当双方都开吃后，自动结算本餐胜负。',
+      '游戏流程',
+      '游戏顺序：早餐 → 午餐 → 晚餐 → 夜宵。',
+      '每餐可以选择：点外卖，或开吃。',
+      '双方都开吃后，自动结算本餐。',
 
-      '⚠️ 爆牌规则',
-      '每餐都有一个警戒线。',
+      '爆牌规则',
+      '每餐都有警戒线。',
       '总热量超过警戒线 = 爆牌。',
       '爆牌者本餐直接输。',
-      '爆牌这一餐的热量不会计入今日总热量。',
+      '爆牌这一餐的热量不计入今日总热量。',
 
-      '👀 信息规则',
+      '信息规则',
       '对方第一张是暗牌。',
-      '后续抽的都是明牌。',
+      '后续抽的牌都是明牌。',
       '对方热量显示为：？ + 明牌热量。',
 
-      '🧠 卡牌特性',
+      '卡牌特性',
       '每张牌都有不同热量。',
       '有低热量补分牌，也有高热量风险牌。',
-      '刺客牌看起来安全，但容易让你意外爆牌。',
+      '刺客牌看起来安全，但可能让你意外爆牌。',
 
-      '🧩 牌型系统',
-      '牌型仅在不爆牌时生效。',
-      '中级牌型奖励：+1张荤牌计入今日总热量。',
-      '双拼套餐：任意两类 ≥2张。',
-      '偏科套餐：任意一类 ≥3张。',
-      '高级牌型奖励：本餐直接+1分。',
-      '满汉大餐：四类齐全且 ≥5张。',
+      '牌型系统',
+      '牌型只在不爆牌时生效。',
+      '中级牌型奖励：加1张荤牌计入今日总热量。',
+      '双拼套餐：任意两类各有至少2张。',
+      '偏科套餐：任意一类至少3张。',
+      '高级牌型奖励：本餐直接加1分。',
+      '满汉大餐：四类齐全，且总牌数至少5张。',
       '卡线大师：总热量刚好等于警戒线。',
-      '每餐只触发最高级一个牌型。',
+      '每餐只触发最高级的一个牌型。',
 
-      '🌙 夜宵规则',
+      '夜宵规则',
       '夜宵会使用剩余所有外卖次数。',
       '一次性点完，然后统一结算。',
 
-      '✅ 一句话总结',
-      '在不爆的前提下，比对方更接近极限。'
+      '一句话总结',
+      '不爆牌，并且比对方更接近警戒线。'
     ]
   },
   en: {
@@ -368,45 +368,45 @@ const I18N = {
     draw2: 'Draw 2 cards',
     pickAll: 'Pick all',
     rulesLines: [
-      '🎯 Goal',
-      'Winning a meal gives 1 point. There are 4 meals in a day. Higher final score wins.',
+      'Goal',
+      'Win a meal to gain 1 point. There are 4 meals. Higher final score wins.',
 
-      '🔁 Game Flow',
-      'The day has 4 meals: Breakfast → Lunch → Dinner → Night Snack.',
-      'During each meal, you may keep ordering cards or choose Eat to stop.',
-      'When both players choose Eat, the meal is settled automatically.',
+      'Game Flow',
+      'Meal order: Breakfast → Lunch → Dinner → Night Snack.',
+      'During each meal, choose Order or Eat.',
+      'When both players choose Eat, the meal is settled.',
 
-      '⚠️ Bust Rule',
+      'Bust Rule',
       'Each meal has a calorie limit.',
       'Going over the limit means Bust.',
-      'If you bust, you lose that meal immediately.',
+      'If you bust, you lose that meal.',
       'Calories from a busted meal do not count toward your daily total.',
 
-      '👀 Information',
-      'The rival’s first card is hidden.',
+      'Information',
+      'The rival first card is hidden.',
       'All later cards are visible.',
-      'The rival’s calories show as: ? + visible calories.',
+      'Rival calories show as: ? + visible calories.',
 
-      '🧠 Card Traits',
+      'Card Traits',
       'Each card has a different calorie value.',
-      'Some cards are low-calorie fillers, while others are high-risk cards.',
+      'Some cards are low-calorie fillers. Some are high-risk cards.',
       'Assassin cards may look safe, but can unexpectedly make you bust.',
 
-      '🧩 Combo System',
+      'Combo System',
       'Combos only activate if you do not bust.',
-      'Mid combo reward: +1 Meat card added to your daily total.',
+      'Mid combo reward: add 1 Meat card to your daily total.',
       'Double Combo: any two categories have at least 2 cards each.',
       'One-Type Combo: any one category has at least 3 cards.',
-      'High combo reward: +1 point for this meal.',
-      'Full Feast: all 4 categories appear and you have at least 5 cards.',
+      'High combo reward: gain 1 extra point for this meal.',
+      'Full Feast: all 4 categories appear, with at least 5 total cards.',
       'Limit Master: your calories exactly equal the limit.',
       'Only the highest combo can trigger each meal.',
 
-      '🌙 Night Snack',
+      'Night Snack',
       'Night Snack uses all remaining order chances.',
-      'Choose them all at once, then reveal and settle.',
+      'Choose all at once, then reveal and settle.',
 
-      '✅ Summary',
+      'Summary',
       'Do not bust. Get closer to the limit than your rival.'
     ]
   }
@@ -2762,43 +2762,35 @@ function drawActionButtons() {
 
 
 
-
 function drawGameScreen() {
+  drawTopBadge()
+
+  const isOnline = appMode === 'online'
+  const topY = SAFE_TOP + (isOnline ? 34 : 4)
+  const actionY = H - SAFE_BOTTOM - 94
+  const gap = H < 700 ? 5 : 8
+  const centerH = H < 680 ? 66 : H < 760 ? 74 : 86
+
+  const available = Math.max(300, actionY - topY - centerH - gap * 2 - 8)
+  let zoneH = Math.floor(available / 2)
+
+  // 全机型自适应：小屏时宁可压缩卡牌区，也不要压扁底部按钮。
+  const minZone = H < 680 ? 116 : H < 760 ? 132 : 150
+  const maxZone = H > 850 ? 248 : 220
+  zoneH = Math.max(minZone, Math.min(maxZone, zoneH))
+
   const ids = getDisplayPlayerIds()
-  const centerH = H < 720 ? 76 : 86
-  const gap = H < 720 ? 8 : 10
-  const actionH = 92
-
-  // 顶部按钮安全区：给 Music / 中英文 / Home 独立留空间，避免压住对手面板。
-  const topControlsH = 38
-  const topY = Math.max(SAFE_TOP + topControlsH, 50)
-
-  const availableH = H - topY - actionH - SAFE_BOTTOM - 12
-  const panelH = Math.max(145, Math.floor((availableH - centerH - gap * 2) / 2))
-
-  const oppY = topY
-  const centerY = oppY + panelH + gap
+  const opponentY = topY
+  const centerY = opponentY + zoneH + gap
   const selfY = centerY + centerH + gap
 
-  if (appMode === 'online' && roomId) {
-    const pLabel = selfPlayerId === 'p1'
-      ? (lang === 'en' ? 'P1' : '玩家1')
-      : (lang === 'en' ? 'P2' : '玩家2')
-    const roomLabel = lang === 'en' ? 'Room' : '房间'
-
-    drawRoundRect(W / 2 - 110, Math.max(6, SAFE_TOP - 6), 220, 26, 13, '#111', null, 0)
-    drawText(`${roomLabel} ${roomId}｜${pLabel}`, W / 2, Math.max(11, SAFE_TOP - 1), 11, '#fff', 'center', 'bold')
-  }
-
-  drawPlayerPanel(ids.opponent, t('opponent'), 16, oppY, W - 32, panelH, true)
+  drawPlayerPanel(ids.opponent, t('opponent'), 16, opponentY, W - 32, zoneH, true)
   drawCenterPanel(16, centerY, W - 32, centerH)
-  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, panelH, false)
+  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, zoneH, false)
 
-  drawWaitingOpponentFloat()
   drawActionButtons()
+  drawWaitingOpponentFloat()
 }
-
-
 
 
 
@@ -2941,6 +2933,7 @@ function drawResultPlayer(title, pid, y, h) {
 
 
 
+
 function drawDayResult() {
   const selfId = getSelfId()
   const oppId = otherPlayer(selfId)
@@ -2985,6 +2978,7 @@ function drawDayResult() {
     const res = results[i]
 
     drawRoundRect(20, y, W - 40, blockH, 16, '#FFFFFF', '#111', 2)
+
     drawText(mealName(i), 34, y + 10, lang === 'en' ? 20 : 16, '#111', 'left', 'bold')
 
     if (!res) {
@@ -3030,6 +3024,8 @@ function drawDayResult() {
     addButton('restart_home', t('restartHome'), 24, H - SAFE_BOTTOM - 72, W - 48, 58, '#111', '#fff', 22)
   }
 }
+
+
 
 
 
