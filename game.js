@@ -2762,35 +2762,32 @@ function drawActionButtons() {
 
 
 
+
 function drawGameScreen() {
-  drawTopBadge()
-
-  const isOnline = appMode === 'online'
-  const topY = SAFE_TOP + (isOnline ? 34 : 4)
-  const actionY = H - SAFE_BOTTOM - 94
-  const gap = H < 700 ? 5 : 8
-  const centerH = H < 680 ? 66 : H < 760 ? 74 : 86
-
-  const available = Math.max(300, actionY - topY - centerH - gap * 2 - 8)
-  let zoneH = Math.floor(available / 2)
-
-  // 全机型自适应：小屏时宁可压缩卡牌区，也不要压扁底部按钮。
-  const minZone = H < 680 ? 116 : H < 760 ? 132 : 150
-  const maxZone = H > 850 ? 248 : 220
-  zoneH = Math.max(minZone, Math.min(maxZone, zoneH))
-
   const ids = getDisplayPlayerIds()
-  const opponentY = topY
-  const centerY = opponentY + zoneH + gap
+  const centerH = H < 720 ? 70 : 80
+  const gap = H < 720 ? 6 : 8
+  const actionH = 92
+
+  const topY = SAFE_TOP + 34
+
+  const availableH = H - topY - actionH - SAFE_BOTTOM - 12
+  const panelH = Math.max(130, Math.floor((availableH - centerH - gap * 2) / 2))
+
+  const oppY = topY
+  const centerY = oppY + panelH + gap
   const selfY = centerY + centerH + gap
 
-  drawPlayerPanel(ids.opponent, t('opponent'), 16, opponentY, W - 32, zoneH, true)
+  drawPlayerPanel(ids.opponent, t('opponent'), 16, oppY, W - 32, panelH, true)
   drawCenterPanel(16, centerY, W - 32, centerH)
-  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, zoneH, false)
+  drawPlayerPanel(ids.self, t('you'), 16, selfY, W - 32, panelH, false)
 
-  drawActionButtons()
   drawWaitingOpponentFloat()
+  drawActionButtons()
 }
+
+
+
 
 
 
