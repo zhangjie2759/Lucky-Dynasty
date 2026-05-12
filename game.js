@@ -1,356 +1,501 @@
-'use strict';
+(() => {
+  'use strict';
 
-const $ = (id) => document.getElementById(id);
-const fmt = (n) => '¥' + Math.max(0, Math.floor(n)).toLocaleString('zh-CN');
-const rand = (min, max) => Math.random() * (max - min) + min;
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => '¥' + Math.max(0, Math.floor(n)).toLocaleString('zh-CN');
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-const PRIZE_TIERS = [
-  { name: '小确幸', min: 2000, max: 10000, match: 2, weight: 45, color: '#74c69d' },
-  { name: '改善生活', min: 10000, max: 100000, match: 3, weight: 30, color: '#4dabf7' },
-  { name: '人生推进', min: 100000, max: 1000000, match: 4, weight: 15, color: '#ffd43b' },
-  { name: '阶层跃迁', min: 1000000, max: 10000000, match: 5, weight: 7, color: '#ff922b' },
-  { name: '暴富人生', min: 10000000, max: 100000000, match: 6, weight: 2.7, color: '#f03e3e' },
-  { name: '传说强运', min: 100000000, max: 200000000, match: 7, weight: 0.3, color: '#be4bdb' }
-];
+  const PRIZE_TIERS = [
+    { name: '小确幸', min: 3000, max: 10000, weight: 42 },
+    { name: '改善生活', min: 10000, max: 100000, weight: 30 },
+    { name: '人生推进', min: 100000, max: 1000000, weight: 16 },
+    { name: '阶层跃迁', min: 1000000, max: 10000000, weight: 8 },
+    { name: '暴富人生', min: 10000000, max: 100000000, weight: 3 },
+    { name: '传说强运', min: 100000000, max: 300000000, weight: 1 }
+  ];
 
-const PRODUCTS = [
-  // 生活区
-  { id:'phone', name:'新手机', icon:'📱', price:5999, x:-7, y:2, color:'#8ce99a' },
-  { id:'ebike', name:'电驴', icon:'🛵', price:4999, x:-6, y:5, color:'#69db7c' },
-  { id:'bike', name:'自行车', icon:'🚲', price:1999, x:-3, y:6, color:'#b2f2bb' },
-  { id:'dinner', name:'全家大餐', icon:'🍲', price:2888, x:-9, y:6, color:'#ffd8a8' },
-  { id:'gamepc', name:'游戏电脑', icon:'🖥️', price:8999, x:-5, y:9, color:'#91a7ff' },
-  { id:'momred', name:'爸妈红包', icon:'🧧', price:10000, x:-10, y:10, color:'#ff8787' },
-  // 汽车区
-  { id:'usedcar', name:'二手车', icon:'🚗', price:60000, x:2, y:3, color:'#a5d8ff' },
-  { id:'sedan', name:'油车轿车', icon:'🚘', price:150000, x:5, y:3, color:'#74c0fc' },
-  { id:'ev', name:'电车', icon:'🔋', price:220000, x:8, y:4, color:'#66d9e8' },
-  { id:'suv', name:'SUV', icon:'🚙', price:300000, x:4, y:7, color:'#4dabf7' },
-  { id:'mpv', name:'MPV', icon:'🚐', price:450000, x:8, y:8, color:'#339af0' },
-  { id:'pickup', name:'皮卡', icon:'🛻', price:350000, x:11, y:6, color:'#228be6' },
-  { id:'sport', name:'跑车', icon:'🏎️', price:2000000, x:12, y:11, color:'#ff6b6b' },
-  // 房产区
-  { id:'rent', name:'一年房租', icon:'🛏️', price:30000, x:-2, y:-5, color:'#ffe066' },
-  { id:'renovate', name:'装修', icon:'🛋️', price:150000, x:1, y:-6, color:'#ffd43b' },
-  { id:'downpay', name:'小房首付', icon:'🏠', price:300000, x:4, y:-7, color:'#fcc419' },
-  { id:'apt', name:'市区公寓', icon:'🏢', price:1800000, x:8, y:-8, color:'#fab005' },
-  { id:'villa', name:'别墅', icon:'🏡', price:8000000, x:13, y:-7, color:'#f59f00' },
-  { id:'building', name:'整栋楼', icon:'🏙️', price:80000000, x:18, y:-6, color:'#e67700' },
-  // 奢侈/公司区
-  { id:'watch', name:'名表', icon:'⌚', price:120000, x:-12, y:-4, color:'#eebefa' },
-  { id:'bag', name:'限量包', icon:'👜', price:80000, x:-14, y:-1, color:'#da77f2' },
-  { id:'gold', name:'金条', icon:'🪙', price:300000, x:-15, y:3, color:'#ffd43b' },
-  { id:'jewel', name:'珠宝', icon:'💎', price:1200000, x:-17, y:7, color:'#cc5de8' },
-  { id:'shop', name:'小店', icon:'🏪', price:200000, x:2, y:14, color:'#ffa94d' },
-  { id:'company', name:'公司', icon:'🏭', price:3000000, x:7, y:15, color:'#ff922b' },
-  { id:'office', name:'写字楼', icon:'🏦', price:30000000, x:13, y:17, color:'#fd7e14' },
-  { id:'mall', name:'商业综合体', icon:'🏬', price:150000000, x:20, y:18, color:'#f76707' }
-];
+  const PRODUCTS = [
+    // 低价生活区
+    { id:'snack', name:'全家大餐', icon:'🍜', price:800, zone:'life' },
+    { id:'phone', name:'新手机', icon:'📱', price:5000, zone:'life' },
+    { id:'ebike', name:'电驴', icon:'🛵', price:3500, zone:'life' },
+    { id:'bike', name:'自行车', icon:'🚲', price:1200, zone:'life' },
+    { id:'fridge', name:'大冰箱', icon:'🧊', price:6000, zone:'life' },
+    { id:'redpack', name:'爸妈红包', icon:'🧧', price:10000, zone:'life' },
+    { id:'gamepc', name:'游戏电脑', icon:'🖥️', price:15000, zone:'life' },
 
-let state = {
-  round: 1,
-  totalAssetValue: 0,
-  lifetimeAssets: {},
-  currentPrize: null,
-  winCode: '',
-  myCode: ''
-};
+    // 汽车区
+    { id:'usedcar', name:'二手车', icon:'🚗', price:60000, zone:'car' },
+    { id:'sedan', name:'油车轿车', icon:'🚘', price:150000, zone:'car' },
+    { id:'ev', name:'电车', icon:'🔋', price:220000, zone:'car' },
+    { id:'suv', name:'SUV', icon:'🚙', price:300000, zone:'car' },
+    { id:'mpv', name:'MPV', icon:'🚐', price:450000, zone:'car' },
+    { id:'pickup', name:'皮卡', icon:'🛻', price:280000, zone:'car' },
+    { id:'sport', name:'跑车', icon:'🏎️', price:2000000, zone:'car' },
+    { id:'supercar', name:'限量超跑', icon:'🔥', price:12000000, zone:'car' },
 
-let game = null;
-let scratch = { isDown:false, canvas:null, ctx:null, rect:null, checked:false, lastMeasure:0 };
-let joy = { active:false, dx:0, dy:0 };
+    // 房产区
+    { id:'rent', name:'一年房租', icon:'🔑', price:50000, zone:'house' },
+    { id:'decorate', name:'装修', icon:'🛋️', price:150000, zone:'house' },
+    { id:'downpay', name:'房子首付', icon:'🏠', price:500000, zone:'house' },
+    { id:'apartment', name:'市区公寓', icon:'🏢', price:1800000, zone:'house' },
+    { id:'villa', name:'别墅', icon:'🏡', price:12000000, zone:'house' },
+    { id:'building', name:'整栋楼', icon:'🏙️', price:80000000, zone:'house' },
 
-function show(screen) {
-  ['startScreen','lotteryScreen','gameScreen','resultScreen'].forEach(id => $(id).classList.add('hidden'));
-  $(screen).classList.remove('hidden');
-}
+    // 奢侈/公司/顶级区
+    { id:'bag', name:'名牌包', icon:'👜', price:40000, zone:'luxury' },
+    { id:'watch', name:'名表', icon:'⌚', price:150000, zone:'luxury' },
+    { id:'gold', name:'金条', icon:'🟨', price:500000, zone:'luxury' },
+    { id:'jewel', name:'珠宝', icon:'💎', price:1200000, zone:'luxury' },
+    { id:'stall', name:'小摊创业', icon:'🥞', price:80000, zone:'company' },
+    { id:'shop', name:'开门店', icon:'🏪', price:600000, zone:'company' },
+    { id:'factory', name:'小工厂', icon:'🏭', price:5000000, zone:'company' },
+    { id:'company', name:'公司总部', icon:'🏦', price:50000000, zone:'company' }
+  ];
 
-function weightedTier() {
-  const total = PRIZE_TIERS.reduce((s,t)=>s+t.weight,0);
-  let r = Math.random()*total;
-  for (const tier of PRIZE_TIERS) {
-    r -= tier.weight;
-    if (r <= 0) return tier;
-  }
-  return PRIZE_TIERS[0];
-}
-
-function randomPrize(tier) {
-  const raw = rand(tier.min, tier.max);
-  const step = tier.max >= 10000000 ? 1000000 : tier.max >= 1000000 ? 100000 : tier.max >= 100000 ? 10000 : 1000;
-  return Math.round(raw / step) * step;
-}
-
-function randomCode() {
-  return Array.from({length:9}, () => Math.floor(Math.random()*10)).join('');
-}
-function formatCode(s) { return s.replace(/(\d{3})(\d{3})(\d{3})/,'$1 $2 $3'); }
-function makeMatchedCode(win, match) {
-  const arr = randomCode().split('');
-  const start = 9 - match;
-  for (let i=start;i<9;i++) arr[i] = win[i];
-  if (start>0 && arr[start-1] === win[start-1]) arr[start-1] = String((Number(win[start-1])+1)%10);
-  return arr.join('');
-}
-
-function setupLottery() {
-  state.winCode = randomCode();
-  const tier = weightedTier();
-  const prize = randomPrize(tier);
-  state.currentPrize = { tier, amount: prize };
-  state.myCode = makeMatchedCode(state.winCode, tier.match);
-  $('roundText').textContent = state.round;
-  $('winCodeText').textContent = formatCode(state.winCode);
-  $('myCodeText').textContent = formatCode(state.myCode);
-  $('scratchHint').textContent = '拖动刮开涂层';
-  show('lotteryScreen');
-  requestAnimationFrame(setupScratch);
-}
-
-function setupScratch() {
-  const canvas = $('scratchCanvas');
-  scratch.canvas = canvas;
-  scratch.ctx = canvas.getContext('2d', { willReadFrequently:true });
-  const box = canvas.parentElement.getBoundingClientRect();
-  const dpr = Math.max(1, Math.min(devicePixelRatio || 1, 3));
-  canvas.width = Math.floor(box.width*dpr);
-  canvas.height = Math.floor(box.height*dpr);
-  canvas.style.width = box.width+'px';
-  canvas.style.height = box.height+'px';
-  scratch.ctx.setTransform(dpr,0,0,dpr,0,0);
-  scratch.rect = { width:box.width, height:box.height };
-  scratch.checked = false;
-  paintScratch();
-}
-function paintScratch() {
-  const ctx = scratch.ctx, w = scratch.rect.width, h = scratch.rect.height;
-  ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0,0,w,h);
-  const g = ctx.createLinearGradient(0,0,w,h);
-  g.addColorStop(0,'#f7f4ee'); g.addColorStop(.28,'#99938b'); g.addColorStop(.58,'#d6d0c6'); g.addColorStop(1,'#8f897f');
-  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
-  ctx.globalAlpha=.18;
-  for(let i=0;i<700;i++){ctx.fillStyle=Math.random()>.5?'#fff':'#403a32';ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h,Math.random()*1.6+.3,0,Math.PI*2);ctx.fill();}
-  ctx.globalAlpha=1; ctx.fillStyle='rgba(255,255,255,.28)';
-  for(let x=-w;x<w*2;x+=28){ctx.save();ctx.translate(x,0);ctx.rotate(-.7);ctx.fillRect(0,-h,10,h*3);ctx.restore();}
-  ctx.fillStyle='rgba(36,23,11,.65)'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font='900 22px sans-serif'; ctx.fillText('刮开你的强运码', w/2, h/2-10);
-  ctx.font='800 13px sans-serif'; ctx.fillText('刮完进入购物地图', w/2, h/2+24);
-}
-function scratchAt(x,y) {
-  if (scratch.checked || !scratch.ctx) return;
-  const r = 32;
-  const ctx = scratch.ctx;
-  ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();
-  const now = performance.now();
-  if (now - scratch.lastMeasure > 150) {
-    scratch.lastMeasure = now;
-    const p = measureScratch();
-    $('scratchHint').textContent = `已刮开 ${Math.round(p*100)}%`;
-    if (p > .58) revealLottery();
-  }
-}
-function measureScratch() {
-  const c=scratch.canvas, d=scratch.ctx.getImageData(0,0,c.width,c.height).data;
-  let clear=0,total=0;
-  for(let i=3;i<d.length;i+=80){total++; if(d[i]<90) clear++;}
-  return clear/total;
-}
-function revealLottery() {
-  if (scratch.checked) return;
-  scratch.checked = true;
-  scratch.ctx.globalCompositeOperation='destination-out';
-  scratch.ctx.fillRect(0,0,scratch.rect.width,scratch.rect.height);
-  const p = state.currentPrize;
-  $('scratchHint').textContent = `${p.tier.name}：${fmt(p.amount)}`;
-  setTimeout(startShoppingGame, 750);
-}
-
-function initGame() {
-  const canvas = $('gameCanvas');
-  game = {
-    canvas, ctx: canvas.getContext('2d'),
-    w:0,h:0, last:0, camera:{x:0,y:0},
-    player:{x:0,y:0,r:15,speed:145,path:[],tail:[]},
-    cash: state.currentPrize.amount,
-    budget: state.currentPrize.amount,
-    spent:0, warning:false, ended:false,
-    bought: {},
-    items: PRODUCTS.map(p => ({...p, bought:false})),
-    home:{x:0,y:0,r:38},
+  const state = {
+    gen: 1,
+    totalAsset: 0,
+    budget: 0,
+    spent: 0,
+    warning: 0,
+    prizeTier: null,
+    inventory: {},
+    roundItems: [],
+    running: false,
+    gameOver: false,
+    win: false
   };
-  resizeGame();
-  updateHud();
-  showToast(`${state.currentPrize.tier.name}！预算 ${fmt(game.budget)}，开始扫货！`);
-  requestAnimationFrame(loop);
-}
-function resizeGame(){
-  const dpr=Math.max(1,Math.min(devicePixelRatio||1,2));
-  game.w=innerWidth; game.h=innerHeight;
-  game.canvas.width=Math.floor(game.w*dpr); game.canvas.height=Math.floor(game.h*dpr);
-  game.canvas.style.width=game.w+'px'; game.canvas.style.height=game.h+'px';
-  game.ctx.setTransform(dpr,0,0,dpr,0,0);
-}
-function worldToIso(x,y){
-  const tileW=64, tileH=32;
-  return {x:(x-y)*tileW/2, y:(x+y)*tileH/2};
-}
-function screenPos(wx,wy){
-  const p=worldToIso(wx,wy);
-  return {x:p.x - game.camera.x + game.w/2, y:p.y - game.camera.y + game.h/2};
-}
-function updateCamera(){
-  const p=worldToIso(game.player.x, game.player.y);
-  game.camera.x += (p.x - game.camera.x)*0.10;
-  game.camera.y += (p.y - game.camera.y)*0.10;
-}
-function loop(t){
-  if (!game || game.ended) return;
-  const dt=Math.min(.033,(t-(game.last||t))/1000); game.last=t;
-  update(dt); draw(); requestAnimationFrame(loop);
-}
-function update(dt){
-  const mag=Math.hypot(joy.dx,joy.dy);
-  if(mag>.08){
-    const nx=joy.dx/mag, ny=joy.dy/mag;
-    game.player.x += nx*game.player.speed*dt/32;
-    game.player.y += ny*game.player.speed*dt/32;
-    game.player.path.unshift({x:game.player.x,y:game.player.y});
-    game.player.path = game.player.path.slice(0, 1200);
+
+  let scratch = { canvas:null, ctx:null, rect:null, revealed:false, down:false, last:0 };
+
+  let game = {
+    canvas:null, ctx:null, w:0, h:0, tileW:64, tileH:32,
+    gridW:32, gridH:32,
+    player:{ x:3, y:28, dir:1 }, // 0上 1右 2下 3左
+    snake:[],
+    products:[],
+    home:{ x:3, y:28 },
+    stepMs:185,
+    acc:0,
+    lastTime:0,
+    camera:{ x:0, y:0 }
+  };
+
+  function show(id){
+    ['startScreen','lotteryScreen','gameScreen','resultScreen'].forEach(s => $(s).classList.add('hidden'));
+    $(id).classList.remove('hidden');
   }
-  // tail follows path
-  game.player.tail.forEach((seg,i)=>{
-    const idx=(i+1)*13;
-    const pos=game.player.path[idx];
-    if(pos){seg.x += (pos.x-seg.x)*0.35; seg.y += (pos.y-seg.y)*0.35;}
-  });
-  game.player.x=clamp(game.player.x,-22,22); game.player.y=clamp(game.player.y,-12,22);
-  checkCollisions(); updateCamera();
-}
-function checkCollisions(){
-  for(const item of game.items){
-    if(item.bought) continue;
-    const d=Math.hypot(game.player.x-item.x, game.player.y-item.y);
-    if(d<0.58){ buyItem(item); break; }
+
+  function startGame(){
+    show('lotteryScreen');
+    prepareLottery();
   }
-  if (game.spent>0 && Math.hypot(game.player.x-game.home.x, game.player.y-game.home.y)<0.9) finishShopping(true);
-}
-function buyItem(item){
-  if (game.cash >= item.price){
-    game.cash -= item.price; game.spent += item.price; item.bought = true;
-    game.bought[item.id] = (game.bought[item.id]||0)+1;
-    state.lifetimeAssets[item.id] = (state.lifetimeAssets[item.id]||0)+1;
-    state.totalAssetValue += item.price;
-    const last = game.player.tail[game.player.tail.length-1] || game.player;
-    game.player.tail.push({x:last.x,y:last.y, icon:item.icon, name:item.name, price:item.price, color:item.color});
-    showToast(`买下 ${item.icon} ${item.name} -${fmt(item.price)}`);
-    updateHud(); renderAssets();
-  } else {
-    if (!game.warning){
-      game.warning = true;
-      showToast(`钱不够买「${item.name}」！再撞贵东西就去上班！`);
-      setTimeout(()=>{ if(game) game.warning=false; }, 2600);
-    } else {
-      finishShopping(false, `你现金不足，却撞上了「${item.name}」。`);
+
+  function prepareLottery(){
+    $('genText').textContent = state.gen;
+    $('totalAssetText').textContent = fmt(state.totalAsset);
+    state.prizeTier = drawTier();
+    state.budget = randomBudget(state.prizeTier);
+    state.spent = 0;
+    state.warning = 0;
+    state.roundItems = [];
+    state.gameOver = false;
+    state.win = false;
+    $('prizeText').textContent = '???';
+    $('tierText').textContent = '刮开揭晓';
+    $('enterMallBtn').classList.add('hidden');
+    setupScratch();
+  }
+
+  function drawTier(){
+    const total = PRIZE_TIERS.reduce((s,t)=>s+t.weight,0);
+    let r = Math.random()*total;
+    for(const t of PRIZE_TIERS){ r -= t.weight; if(r<=0) return t; }
+    return PRIZE_TIERS[0];
+  }
+
+  function randomBudget(t){
+    const a = Math.log10(t.min), b = Math.log10(t.max);
+    const value = Math.pow(10, a + Math.random()*(b-a));
+    return Math.round(value / 100) * 100;
+  }
+
+  function setupScratch(){
+    scratch.canvas = $('scratchCanvas');
+    scratch.ctx = scratch.canvas.getContext('2d', { willReadFrequently:true });
+    scratch.revealed = false;
+    resizeScratch();
+    paintScratch();
+  }
+
+  function resizeScratch(){
+    const box = scratch.canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    scratch.rect = { width:box.width, height:box.height };
+    scratch.canvas.width = Math.max(1, Math.floor(box.width*dpr));
+    scratch.canvas.height = Math.max(1, Math.floor(box.height*dpr));
+    scratch.ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function paintScratch(){
+    const ctx = scratch.ctx, w = scratch.rect.width, h = scratch.rect.height;
+    ctx.clearRect(0,0,w,h);
+    const g = ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'#f8f6ef'); g.addColorStop(.25,'#aaa39a'); g.addColorStop(.55,'#d9d3c8'); g.addColorStop(1,'#8f887f');
+    ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+    ctx.globalAlpha = .18;
+    for(let i=0;i<750;i++){
+      ctx.fillStyle = Math.random()>.5 ? '#fff' : '#3d3832';
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, Math.random()*1.8+.3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(36,23,11,.55)';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font = '900 24px -apple-system,BlinkMacSystemFont,sans-serif';
+    ctx.fillText('刮开强运预算', w/2, h/2-10);
+    ctx.font = '800 14px -apple-system,BlinkMacSystemFont,sans-serif';
+    ctx.fillText('决定你能扫多少货', w/2, h/2+24);
+  }
+
+  function scratchAt(e){
+    if(scratch.revealed) return;
+    e.preventDefault();
+    const p = getPoint(e);
+    const box = scratch.canvas.getBoundingClientRect();
+    const x = p.x - box.left, y = p.y - box.top;
+    const ctx = scratch.ctx;
+    ctx.save(); ctx.globalCompositeOperation='destination-out';
+    ctx.beginPath(); ctx.arc(x,y,34,0,Math.PI*2); ctx.fill(); ctx.restore();
+    const now = performance.now();
+    if(now - scratch.last > 160){
+      scratch.last = now;
+      if(measureScratch() > .55) revealPrize();
     }
   }
-}
-function draw(){
-  const ctx=game.ctx; ctx.clearRect(0,0,game.w,game.h);
-  drawMap(ctx); drawItems(ctx); drawTail(ctx); drawPlayer(ctx); drawHome(ctx);
-}
-function drawMap(ctx){
-  ctx.fillStyle='#e8d2a1'; ctx.fillRect(0,0,game.w,game.h);
-  const ranges=[[-24,24],[-14,24]];
-  for(let y=ranges[1][0]; y<=ranges[1][1]; y++){
-    for(let x=ranges[0][0]; x<=ranges[0][1]; x++){
-      const s=screenPos(x,y); if(s.x<-80||s.x>game.w+80||s.y<-80||s.y>game.h+80) continue;
-      ctx.beginPath(); ctx.moveTo(s.x,s.y-16); ctx.lineTo(s.x+32,s.y); ctx.lineTo(s.x,s.y+16); ctx.lineTo(s.x-32,s.y); ctx.closePath();
-      const zone = x>10||y>13 ? '#e8b169' : x>1&&y>1 ? '#c6e1f7' : x< -10 ? '#e6c8ff' : y< -4 ? '#ffe082' : '#d7edbf';
-      ctx.fillStyle=zone; ctx.fill(); ctx.strokeStyle='rgba(70,45,10,.12)'; ctx.stroke();
+
+  function measureScratch(){
+    const data = scratch.ctx.getImageData(0,0,scratch.canvas.width,scratch.canvas.height).data;
+    let total=0, clear=0;
+    for(let i=3;i<data.length;i+=80){ total++; if(data[i]<90) clear++; }
+    return clear/total;
+  }
+
+  function revealPrize(){
+    scratch.revealed = true;
+    scratch.ctx.clearRect(0,0,scratch.rect.width,scratch.rect.height);
+    $('prizeText').textContent = fmt(state.budget);
+    $('tierText').textContent = `${state.prizeTier.name} · 本局预算`;
+    $('enterMallBtn').classList.remove('hidden');
+  }
+
+  function enterMall(){
+    if(!scratch.revealed) revealPrize();
+    show('gameScreen');
+    initRound();
+  }
+
+  function initRound(){
+    state.spent = 0; state.warning = 0; state.roundItems = []; state.running = true; state.gameOver = false; state.win = false;
+    game.player = { x:3, y:28, dir:1 };
+    game.snake = [{ x:3, y:28, icon:'🧍', name:'你' }];
+    game.home = { x:3, y:28 };
+    game.stepMs = 185;
+    resizeGame();
+    generateProducts();
+    updateHud();
+    $('gameMessage').classList.add('hidden');
+    game.lastTime = performance.now(); game.acc = 0;
+    requestAnimationFrame(loop);
+  }
+
+  function resizeGame(){
+    game.canvas = $('gameCanvas'); game.ctx = game.canvas.getContext('2d');
+    const box = game.canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    game.w = box.width; game.h = box.height;
+    game.canvas.width = Math.floor(box.width*dpr); game.canvas.height = Math.floor(box.height*dpr);
+    game.ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function generateProducts(){
+    game.products = [];
+    const affordableMax = state.budget * 1.25;
+    const candidates = PRODUCTS.filter(p => p.price <= affordableMax || Math.random() < .35);
+    // 分区坐标，让高价物在更深处，大奖优势明显。
+    const zones = {
+      life:    { x1:5,  y1:23, x2:15, y2:30, count:18 },
+      car:     { x1:12, y1:14, x2:24, y2:23, count:16 },
+      house:   { x1:18, y1:5,  x2:30, y2:15, count:14 },
+      luxury:  { x1:4,  y1:5,  x2:14, y2:15, count:12 },
+      company: { x1:20, y1:20, x2:30, y2:30, count:12 }
+    };
+    for(const [zone, z] of Object.entries(zones)){
+      const list = candidates.filter(p => p.zone === zone);
+      for(let i=0;i<z.count;i++){
+        const prod = pick(list.length?list:PRODUCTS);
+        game.products.push({ ...prod, x:randInt(z.x1,z.x2), y:randInt(z.y1,z.y2), bought:false });
+      }
+    }
+    // 出口/家固定在起点，但要绕回来。
+  }
+
+  function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+  function turnLeft(){ if(!state.running) return; game.player.dir = (game.player.dir + 3) % 4; }
+  function turnRight(){ if(!state.running) return; game.player.dir = (game.player.dir + 1) % 4; }
+
+  function loop(t){
+    if(!state.running) return;
+    const dt = t - game.lastTime; game.lastTime = t; game.acc += dt;
+    while(game.acc >= game.stepMs){ step(); game.acc -= game.stepMs; }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function step(){
+    const dirs = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0}];
+    const d = dirs[game.player.dir];
+    const nx = game.player.x + d.x;
+    const ny = game.player.y + d.y;
+
+    if(nx < 0 || ny < 0 || nx >= game.gridW || ny >= game.gridH){
+      // 撞墙自动回弹转向，降低挫败。
+      game.player.dir = (game.player.dir + 1) % 4;
+      return;
+    }
+
+    const oldHead = { x:game.player.x, y:game.player.y, icon:'🧍', name:'你' };
+    game.player.x = nx; game.player.y = ny;
+    game.snake.unshift(oldHead);
+    game.snake = game.snake.slice(0, Math.max(1, state.roundItems.length + 1));
+    game.snake[0] = { x:nx, y:ny, icon:'🧍', name:'你' };
+
+    const prod = game.products.find(p => !p.bought && p.x === nx && p.y === ny);
+    if(prod) buyProduct(prod);
+
+    if(nx === game.home.x && ny === game.home.y && state.roundItems.length > 0){
+      winRound();
     }
   }
-  drawZoneLabel(ctx,'生活区',-8,8); drawZoneLabel(ctx,'汽车区',7,7); drawZoneLabel(ctx,'房产区',8,-7); drawZoneLabel(ctx,'奢侈区',-15,3); drawZoneLabel(ctx,'公司区',8,15);
-}
-function drawZoneLabel(ctx,text,x,y){ const s=screenPos(x,y); ctx.fillStyle='rgba(23,17,10,.55)'; ctx.font='900 14px sans-serif'; ctx.textAlign='center'; ctx.fillText(text,s.x,s.y-26); }
-function drawHome(ctx){
-  const s=screenPos(game.home.x,game.home.y);
-  ctx.save(); ctx.fillStyle='#fff'; ctx.strokeStyle='#2f9f6a'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(s.x,s.y,34,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏠',s.x,s.y); ctx.restore();
-}
-function drawItems(ctx){
-  const sorted=[...game.items].sort((a,b)=>a.x+a.y-b.x-b.y);
-  for(const item of sorted){
-    if(item.bought) continue;
-    const s=screenPos(item.x,item.y);
-    if(s.x<-80||s.x>game.w+80||s.y<-80||s.y>game.h+80) continue;
-    ctx.save(); ctx.fillStyle=item.price>game.cash?'rgba(217,64,49,.88)':item.color; ctx.beginPath(); ctx.roundRect(s.x-24,s.y-38,48,48,14); ctx.fill();
-    ctx.font='25px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(item.icon,s.x,s.y-14);
-    ctx.fillStyle='#24170b'; ctx.font='900 10px sans-serif'; ctx.fillText(shortMoney(item.price),s.x,s.y+20);
+
+  function buyProduct(prod){
+    const left = state.budget - state.spent;
+    if(prod.price > left){
+      if(state.warning === 0){
+        state.warning = 1;
+        showMsg(`钱不够买「${prod.name}」！再撞贵东西就负债去上班。`);
+        // 弹开商品，不购买。
+        prod.x = clamp(prod.x + randInt(-2,2), 0, game.gridW-1);
+        prod.y = clamp(prod.y + randInt(-2,2), 0, game.gridH-1);
+      } else {
+        loseRound(`你撞上了买不起的「${prod.name}」，负债爆炸。`);
+      }
+      updateHud();
+      return;
+    }
+    prod.bought = true;
+    state.spent += prod.price;
+    state.roundItems.push(prod);
+    state.inventory[prod.id] = (state.inventory[prod.id] || 0) + 1;
+    game.snake.push({ x:game.snake[game.snake.length-1].x, y:game.snake[game.snake.length-1].y, icon:prod.icon, name:prod.name });
+    game.stepMs = Math.max(105, 185 - state.roundItems.length * 3);
+    showMsg(`买下 ${prod.icon} ${prod.name} -${fmt(prod.price)}`);
+    updateHud();
+  }
+
+  function showMsg(text){
+    const el = $('gameMessage');
+    el.textContent = text;
+    el.classList.remove('hidden');
+    clearTimeout(showMsg.timer);
+    showMsg.timer = setTimeout(()=>el.classList.add('hidden'), 1100);
+  }
+
+  function updateHud(){
+    $('budgetText').textContent = fmt(state.budget);
+    $('spentText').textContent = fmt(state.spent);
+    $('cashLeftText').textContent = fmt(state.budget - state.spent);
+    $('warningText').textContent = `${state.warning}/1`;
+  }
+
+  function winRound(){
+    state.running = false; state.win = true;
+    state.totalAsset += state.spent;
+    showResult(true, '成功回家！', `你拖着${state.roundItems.length}件战利品回家，本局购买价值${fmt(state.spent)}。`);
+  }
+
+  function loseRound(reason){
+    state.running = false; state.gameOver = true;
+    showResult(false, '去上班结局', `${reason} 强运世代暂时结束，你只能去上班。`);
+  }
+
+  function showResult(success,title,desc){
+    $('resultTitle').textContent = title;
+    $('resultDesc').textContent = desc;
+    $('resultBudget').textContent = fmt(state.budget);
+    $('resultSpent').textContent = fmt(state.spent);
+    $('resultLeft').textContent = fmt(state.budget - state.spent);
+    $('resultCount').textContent = `${state.roundItems.length} 件`;
+    renderInventory();
+    show('resultScreen');
+  }
+
+  function renderInventory(){
+    const grid = $('inventoryGrid');
+    const entries = Object.entries(state.inventory);
+    if(!entries.length){ grid.innerHTML = '<p>还没有资产。</p>'; return; }
+    grid.innerHTML = entries.map(([id,count])=>{
+      const p = PRODUCTS.find(x=>x.id===id) || {icon:'🎁',name:id};
+      return `<div class="inv-item"><i>${p.icon}</i><span>${p.name} ×${count}</span></div>`;
+    }).join('');
+  }
+
+  function nextRound(){
+    state.gen += 1;
+    show('lotteryScreen');
+    prepareLottery();
+  }
+
+  function isoToScreen(x,y){
+    const tw=game.tileW, th=game.tileH;
+    return { sx:(x-y)*tw/2, sy:(x+y)*th/2 };
+  }
+
+  function draw(){
+    const ctx = game.ctx;
+    ctx.clearRect(0,0,game.w,game.h);
+    const playerIso = isoToScreen(game.player.x, game.player.y);
+    game.camera.x = game.w/2 - playerIso.sx;
+    game.camera.y = game.h/2 - playerIso.sy;
+
+    ctx.save();
+    ctx.translate(game.camera.x, game.camera.y);
+
+    drawMap(ctx);
+    drawProducts(ctx);
+    drawHome(ctx);
+    drawSnake(ctx);
     ctx.restore();
   }
-}
-function drawTail(ctx){
-  for(let i=game.player.tail.length-1;i>=0;i--){
-    const seg=game.player.tail[i], s=screenPos(seg.x,seg.y);
-    ctx.save(); ctx.globalAlpha=.95; ctx.fillStyle=seg.color || '#ffd43b'; ctx.beginPath(); ctx.roundRect(s.x-18,s.y-25,36,36,11); ctx.fill();
-    ctx.font='21px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(seg.icon,s.x,s.y-7); ctx.restore();
+
+  function drawMap(ctx){
+    for(let y=0;y<game.gridH;y++){
+      for(let x=0;x<game.gridW;x++){
+        const {sx,sy}=isoToScreen(x,y);
+        const even=(x+y)%2===0;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx+game.tileW/2, sy+game.tileH/2);
+        ctx.lineTo(sx, sy+game.tileH);
+        ctx.lineTo(sx-game.tileW/2, sy+game.tileH/2);
+        ctx.closePath();
+        ctx.fillStyle = even ? '#e8c98d' : '#dfbd7d';
+        ctx.fill();
+        ctx.strokeStyle='rgba(70,38,0,.12)'; ctx.stroke();
+      }
+    }
   }
-}
-function drawPlayer(ctx){
-  const s=screenPos(game.player.x,game.player.y);
-  ctx.save(); ctx.fillStyle='#17110a'; ctx.beginPath(); ctx.arc(s.x,s.y-10,18,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🛒',s.x,s.y-10); ctx.restore();
-}
-function shortMoney(n){ if(n>=100000000) return (n/100000000).toFixed(n%100000000?1:0)+'亿'; if(n>=10000) return (n/10000).toFixed(n%10000?1:0)+'万'; return n; }
 
-function startShoppingGame(){ show('gameScreen'); initGame(); renderAssets(); }
-function updateHud(){
-  $('budgetText').textContent=fmt(game.budget); $('cashText').textContent=fmt(game.cash); $('spentText').textContent=fmt(game.spent); $('countText').textContent=game.player.tail.length;
-}
-function showToast(text){ const el=$('toast'); el.textContent=text; el.classList.remove('hidden'); clearTimeout(showToast.timer); showToast.timer=setTimeout(()=>el.classList.add('hidden'),1800); }
-function renderAssets(){
-  const list=$('assetList'); const entries=Object.entries(state.lifetimeAssets);
-  $('assetTotalMini').textContent=entries.reduce((s,[,c])=>s+c,0); $('assetValueText').textContent=fmt(state.totalAssetValue);
-  if(!entries.length){list.innerHTML='<div class="asset-row"><b>还没有资产</b><span>先去刮奖</span></div>';return;}
-  list.innerHTML=entries.map(([id,count])=>{const p=PRODUCTS.find(x=>x.id===id);return `<div class="asset-row"><b>${p.icon} ${p.name}</b><span>×${count}</span></div>`}).join('');
-}
-function finishShopping(success, reason=''){
-  if(game.ended) return; game.ended=true;
-  const title = success ? '成功把战利品带回家' : '负债爆炸，去上班';
-  const desc = success ? `你用 ${fmt(game.budget)} 的预算，买回了 ${game.player.tail.length} 件东西。` : reason;
-  $('resultTitle').textContent=title; $('resultDesc').textContent=desc;
-  $('resultStats').innerHTML=`<div><span>本局预算</span><strong>${fmt(game.budget)}</strong></div><div><span>买到价值</span><strong>${fmt(game.spent)}</strong></div><div><span>剩余现金</span><strong>${fmt(game.cash)}</strong></div><div><span>本局资产数</span><strong>${game.player.tail.length}</strong></div>`;
-  state.round += 1; game=null; show('resultScreen');
-}
+  function drawHome(ctx){
+    const {sx,sy}=isoToScreen(game.home.x,game.home.y);
+    drawBubble(ctx,sx,sy-10,'🏠','家 / 出口','#249a66');
+  }
 
-function bindScratch(){
-  const c=$('scratchCanvas');
-  const point=e=>{const r=c.getBoundingClientRect(); const t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}};
-  const start=e=>{e.preventDefault(); scratch.isDown=true; const p=point(e); scratchAt(p.x,p.y)};
-  const move=e=>{if(!scratch.isDown)return; e.preventDefault(); const p=point(e); scratchAt(p.x,p.y)};
-  const end=e=>{scratch.isDown=false};
-  c.addEventListener('pointerdown',start,{passive:false}); c.addEventListener('pointermove',move,{passive:false}); c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
-  c.addEventListener('touchstart',start,{passive:false}); c.addEventListener('touchmove',move,{passive:false}); c.addEventListener('touchend',end);
-}
-function bindJoystick(){
-  const joyEl=$('joystick'), stick=$('stick'); let active=false;
-  const calc=e=>{const r=joyEl.getBoundingClientRect(); const t=e.touches&&e.touches[0]?e.touches[0]:e; const cx=r.left+r.width/2, cy=r.top+r.height/2; let dx=t.clientX-cx, dy=t.clientY-cy; const m=Math.hypot(dx,dy), max=34; if(m>max){dx=dx/m*max; dy=dy/m*max;} stick.style.transform=`translate(${dx}px,${dy}px)`; joy.dx=dx/max; joy.dy=dy/max;};
-  const start=e=>{e.preventDefault(); active=true; calc(e)}; const move=e=>{if(!active)return; e.preventDefault(); calc(e)}; const end=()=>{active=false; joy.dx=0; joy.dy=0; stick.style.transform='translate(0,0)'};
-  joyEl.addEventListener('pointerdown',start,{passive:false}); window.addEventListener('pointermove',move,{passive:false}); window.addEventListener('pointerup',end);
-  joyEl.addEventListener('touchstart',start,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',end);
-}
+  function drawProducts(ctx){
+    for(const p of game.products){
+      if(p.bought) continue;
+      const {sx,sy}=isoToScreen(p.x,p.y);
+      const affordable = p.price <= state.budget - state.spent;
+      drawBubble(ctx,sx,sy-8,p.icon,shortPrice(p.price), affordable ? '#fffdf7' : '#ffd2c9');
+    }
+  }
 
-$('startBtn').addEventListener('click', setupLottery);
-$('resetBtn').addEventListener('click', ()=>{ location.reload(); });
-$('revealBtn').addEventListener('click', revealLottery);
-$('nextRoundBtn').addEventListener('click', setupLottery);
-$('assetToggle').addEventListener('click', ()=>$('assetPanel').classList.toggle('hidden'));
-window.addEventListener('resize',()=>{ if(game) resizeGame(); if(!scratch.checked && !document.getElementById('lotteryScreen').classList.contains('hidden')) setupScratch(); });
+  function drawSnake(ctx){
+    // 从尾到头画，头在最上层
+    for(let i=game.snake.length-1;i>=0;i--){
+      const seg = game.snake[i];
+      const {sx,sy}=isoToScreen(seg.x,seg.y);
+      if(i===0){
+        drawBubble(ctx,sx,sy-16,'🛒','你','#17100a',true);
+      }else{
+        drawBubble(ctx,sx,sy-10,seg.icon,'','#f5b73f');
+      }
+    }
+  }
 
-if(!CanvasRenderingContext2D.prototype.roundRect){
-  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){this.beginPath();this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath();return this;}
-}
+  function drawBubble(ctx,x,y,icon,label,bg,dark=false){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.beginPath();
+    ctx.ellipse(0,24,24,10,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(36,23,11,.18)'; ctx.fill();
+    roundRect(ctx,-24,-36,48,48,14);
+    ctx.fillStyle=bg; ctx.fill();
+    ctx.strokeStyle='rgba(36,23,11,.18)'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.font='26px Apple Color Emoji,Segoe UI Emoji,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(icon,0,-12);
+    if(label){
+      ctx.font='800 10px -apple-system,BlinkMacSystemFont,sans-serif';
+      ctx.fillStyle= dark ? '#fff' : '#24170b';
+      ctx.fillText(label,0,25);
+    }
+    ctx.restore();
+  }
 
-bindScratch(); bindJoystick(); show('startScreen');
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  }
+
+  function shortPrice(n){
+    if(n>=100000000) return (n/100000000).toFixed(n%100000000?1:0)+'亿';
+    if(n>=10000) return (n/10000).toFixed(n%10000?1:0)+'万';
+    return String(n);
+  }
+
+  function getPoint(e){
+    if(e.touches && e.touches.length) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+    if(e.changedTouches && e.changedTouches.length) return {x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+    return {x:e.clientX,y:e.clientY};
+  }
+
+  function bind(){
+    $('startBtn').addEventListener('click', startGame);
+    $('enterMallBtn').addEventListener('click', enterMall);
+    $('nextRoundBtn').addEventListener('click', nextRound);
+    $('leftBtn').addEventListener('click', turnLeft);
+    $('rightBtn').addEventListener('click', turnRight);
+
+    // 左右半屏也能控制，手机更舒服。
+    $('gameCanvas').addEventListener('pointerdown', e => {
+      const x = e.clientX;
+      if(x < window.innerWidth/2) turnLeft(); else turnRight();
+    });
+
+    window.addEventListener('keydown', e => {
+      if(e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') turnLeft();
+      if(e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') turnRight();
+    });
+
+    scratch.canvas = $('scratchCanvas');
+    const down = e => { scratch.down=true; scratchAt(e); };
+    const move = e => { if(scratch.down) scratchAt(e); };
+    const up = () => { scratch.down=false; };
+    scratch.canvas.addEventListener('pointerdown', down, {passive:false});
+    scratch.canvas.addEventListener('pointermove', move, {passive:false});
+    scratch.canvas.addEventListener('pointerup', up, {passive:false});
+    scratch.canvas.addEventListener('pointercancel', up, {passive:false});
+
+    window.addEventListener('resize', () => {
+      if(!$('lotteryScreen').classList.contains('hidden')) setupScratch();
+      if(!$('gameScreen').classList.contains('hidden')) resizeGame();
+    });
+  }
+
+  bind();
+})();
