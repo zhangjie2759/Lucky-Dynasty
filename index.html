@@ -3,93 +3,77 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>强运家族：购物蛇 v2</title>
+  <title>强运家族：购物蛇 2D版</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app">
-    <section id="startScreen" class="screen start-screen">
-      <div class="panel hero">
-        <div class="eyebrow">LUCKY DYNASTY</div>
-        <h1>强运家族</h1>
-        <p>刮彩票决定本局预算，进入人生商场自动前进扫货。碰到商品就买，拖着资产回家结算。</p>
-        <button id="startBtn" class="primary-btn">开始刮彩票</button>
-      </div>
+    <section id="startScreen" class="panel start-panel">
+      <div class="brand">LUCKY DYNASTY</div>
+      <h1>强运家族</h1>
+      <p>刮开一张彩票，拿着这笔钱冲进商场。碰到什么就买什么，钱花爆之前把战利品带回家。</p>
+      <button id="startBtn" class="primary">开始刮奖</button>
     </section>
 
-    <section id="lotteryScreen" class="screen lottery-screen hidden">
-      <div class="topbar">
+    <section id="lotteryScreen" class="panel hidden">
+      <div class="top-row">
         <div>
-          <div class="tiny">GENERATION</div>
-          <strong>第 <span id="genText">1</span> 代</strong>
+          <div class="label">ROUND</div>
+          <h2>第 <span id="roundText">1</span> 局彩票</h2>
         </div>
-        <div class="wealth-mini">总资产 <span id="totalAssetText">¥0</span></div>
+        <div class="cash-pill">总资产 <span id="totalAssetsText">¥0</span></div>
       </div>
 
-      <div class="panel lottery-panel">
-        <div class="eyebrow">SCRATCH TICKET</div>
-        <h2>强运刮刮乐</h2>
-        <p>刮开涂层，看看这一局你能带多少钱进商场。</p>
-
-        <div class="ticket-wrap">
-          <div class="ticket-base">
-            <div class="ticket-label">本局预算</div>
-            <div id="prizeText" class="prize-text">???</div>
-            <div id="tierText" class="tier-text">刮开揭晓</div>
+      <div class="ticket-card">
+        <div class="ticket-head">
+          <span>强运刮刮乐</span>
+          <strong id="ticketCode">000 000 000</strong>
+        </div>
+        <div class="scratch-wrap">
+          <div class="prize-reveal">
+            <div>本局预算</div>
+            <strong id="prizeText">¥???</strong>
+            <small id="tierText">刮开后进入购物蛇</small>
           </div>
           <canvas id="scratchCanvas"></canvas>
         </div>
+        <button id="quickScratchBtn" class="secondary">一键刮开</button>
+      </div>
 
-        <button id="enterMallBtn" class="primary-btn hidden">拿钱进商场</button>
+      <div id="prizeResult" class="result-box hidden">
+        <h3 id="resultTitle">中奖了！</h3>
+        <p id="resultDesc">用这笔钱买到最高价值，然后回家结算。</p>
+        <button id="enterMallBtn" class="primary">进入商场扫货</button>
       </div>
     </section>
 
-    <section id="gameScreen" class="screen game-screen hidden">
+    <section id="gameScreen" class="hidden game-screen">
       <header class="hud">
-        <div class="hud-card">
-          <span>预算</span>
-          <strong id="budgetText">¥0</strong>
-        </div>
-        <div class="hud-card">
-          <span>已花</span>
-          <strong id="spentText">¥0</strong>
-        </div>
-        <div class="hud-card">
-          <span>剩余</span>
-          <strong id="cashLeftText">¥0</strong>
-        </div>
-        <div class="hud-card danger">
-          <span>警告</span>
-          <strong id="warningText">0/1</strong>
-        </div>
+        <div class="hud-item"><span>预算</span><b id="budgetText">¥0</b></div>
+        <div class="hud-item"><span>已买</span><b id="spentText">¥0</b></div>
+        <div class="hud-item"><span>剩余</span><b id="remainText">¥0</b></div>
       </header>
 
-      <main class="game-wrap">
-        <canvas id="gameCanvas"></canvas>
-        <div id="gameMessage" class="game-message hidden"></div>
-      </main>
+      <canvas id="gameCanvas"></canvas>
+
+      <div id="toast" class="toast hidden"></div>
 
       <div class="controls">
-        <button id="leftBtn" class="turn-btn">↶ 左转</button>
-        <button id="rightBtn" class="turn-btn">右转 ↷</button>
+        <button id="leftBtn" class="turn-btn">↺ 左转</button>
+        <button id="rightBtn" class="turn-btn">右转 ↻</button>
+      </div>
+
+      <div class="hint-bar">
+        自动前进，不能停止。碰到商品自动购买，回到绿色“家”结算。
       </div>
     </section>
 
-    <section id="resultScreen" class="screen result-screen hidden">
-      <div class="panel result-panel">
-        <div class="eyebrow">RESULT</div>
-        <h2 id="resultTitle">本局结算</h2>
-        <p id="resultDesc"></p>
-        <div class="result-grid">
-          <div><span>本局预算</span><strong id="resultBudget">¥0</strong></div>
-          <div><span>购买价值</span><strong id="resultSpent">¥0</strong></div>
-          <div><span>剩余现金</span><strong id="resultLeft">¥0</strong></div>
-          <div><span>本局购买</span><strong id="resultCount">0 件</strong></div>
-        </div>
-        <h3>资产栏</h3>
-        <div id="inventoryGrid" class="inventory-grid"></div>
-        <button id="nextRoundBtn" class="primary-btn">继续刮下一张</button>
-      </div>
+    <section id="summaryScreen" class="panel hidden">
+      <div class="brand">RESULT</div>
+      <h2 id="summaryTitle">本局结算</h2>
+      <div id="summaryStats" class="summary-stats"></div>
+      <div id="inventoryList" class="inventory-list"></div>
+      <button id="nextRoundBtn" class="primary">继续刮下一张</button>
     </section>
   </div>
 
